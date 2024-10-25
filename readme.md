@@ -211,7 +211,8 @@ This project is licensed under the [MIT License](LICENSE). You are free to use, 
 
 ## Credits
 
-The [CLI Adventure Game](https://discord.com/channels/1219339944926118008/1298081804208570388/1299511739880177775) was created by [me@spencerthayer.com](me@spencerthayer.com).
+The [CLI Adventure Game](https://discord.com/channels/1219339944926118008/1298081804208570388/1299511739880177775) was created by [me@spencerthayer.com](me@spencerthayer.com). 
+I also participated. [kenrick@thebusypixel.com]@(nsbucky)
 
 ---
 
