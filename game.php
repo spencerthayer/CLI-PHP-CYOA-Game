@@ -4,8 +4,32 @@ if (php_sapi_name() !== 'cli') {
     die("This script must be run from the command line.");
 }
 
-// Replace 'YOUR_API_KEY' with your actual OpenAI API key
-$api_key = 'YOUR_API_KEY';
+// Path to store the API key securely
+$api_key_file = __DIR__ . '/.openai_api_key';
+
+// Function to get the API key
+function get_api_key($api_key_file) {
+    if (file_exists($api_key_file)) {
+        // Read the API key from the file
+        $api_key = trim(file_get_contents($api_key_file));
+        if (!empty($api_key)) {
+            return $api_key;
+        }
+    }
+    // Prompt the user for the API key
+    echo "Please enter your OpenAI API key: ";
+    $api_key = trim(fgets(STDIN));
+
+    // Save the API key to the file
+    file_put_contents($api_key_file, $api_key, LOCK_EX);
+    // Set file permissions to be readable and writable only by the owner
+    chmod($api_key_file, 0600);
+
+    return $api_key;
+}
+
+// Get the API key
+$api_key = get_api_key($api_key_file);
 
 // OpenAI API endpoint
 $url = 'https://api.openai.com/v1/chat/completions';
