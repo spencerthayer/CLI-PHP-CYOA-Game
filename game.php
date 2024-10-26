@@ -67,11 +67,11 @@ $conversation = [];
 $system_prompt = "You are an interactive text-based adventure game called 'The Quest of the Forgotten Realm'. 
 Your role is to guide the player through a fantasy world filled with magic, dragons, and ancient mysteries. 
 In each scene, provide a vivid and immersive description of the surroundings, incorporating basic ASCII art and multiple emojis to represent key elements like landscapes, items, or creatures.
-Use simple terminal colors by wrapping text with color tags like [green]...[/green], [bold]...[/bold], etc., and reset the color or style with [/color] or [/bold].
 At the end of each scene, present exactly four options for the player to choose from, phrased as actions they can take.
 After listing the options, prompt the player to select one.
-Ensure that the storyline is engaging and that the player's choices have meaningful impacts on the adventure.
-Remember to include multiple emojis throughout the descriptions to enhance the visualizations and wrap colored text appropriately.";
+Ensure that the storyline is engaging and that the player's choices have meaningful impacts on the adventure.";
+
+$system_prompt = "Always remember to include multiple emojis throughout the descriptions to enhance the visualizations and wrap colored text appropriately. Use simple terminal colors by wrapping text with color tags like [green]...[/green], [bold]...[/bold], etc., and reset the color or style with [/color] or [/bold].";
 
 // Add the system prompt to the conversation if starting a new game
 $skip_api_call = false;
@@ -126,7 +126,6 @@ if (file_exists($game_history_file)) {
 // Main game loop
 while (true) {
     if (!$skip_api_call) {
-        // Prepare the API request data
         $data = [
             'model' => 'gpt-4o-mini',
             'messages' => $conversation,
