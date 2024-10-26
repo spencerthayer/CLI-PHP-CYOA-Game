@@ -191,7 +191,7 @@ Before you begin, ensure you have met the following requirements:
   - If you have access to GPT-4, you can change the model:
 
     ```php
-    'model' => 'gpt-4',
+    'model' => 'gpt-4o-mini',
     ```
 
 ---
@@ -202,18 +202,8 @@ This project is licensed under the [MIT License](LICENSE). You are free to use, 
 
 ---
 
-## Acknowledgments
-
-- **OpenAI:** For providing the ChatGPT API that powers this game.
-- **Community Contributors:** Thank you to everyone who has contributed suggestions and improvements.
-
----
-
 ## Credits
 
-The [CLI Adventure Game](https://discord.com/channels/1219339944926118008/1298081804208570388/1299511739880177775) was created by [me@spencerthayer.com](me@spencerthayer.com). 
-I also participated. [kenrick@thebusypixel.com]@(nsbucky)
+This game was created by [me@spencerthayer.com](me@spencerthayer.com). 
 
----
-
-Enjoy your adventure in **The Quest of the Forgotten Realm**!
+I also participated, [nsbucky](kenrick@thebusypixel.com).

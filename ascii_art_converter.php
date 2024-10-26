@@ -1,0 +1,48 @@
+<?php
+
+if (isset($argv[1]) && strlen($argv[1])) {
+    $file = $argv[1];
+} else {
+    echo 'Please specify an image file.';
+    exit(1);
+}
+
+// Check if the file exists
+if (!file_exists($file)) {
+    echo 'File not found: ' . $file;
+    exit(1);
+}
+
+$img = imagecreatefromstring(file_get_contents($file));
+if (!$img) {
+    echo 'Unsupported image type or unable to open image.';
+    exit(1);
+}
+
+list($width, $height) = getimagesize($file);
+
+$scale = 8; // Adjust scale for resolution
+
+// Comprehensive character set for better shading
+$chars = " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#$Bg0MNWQ%&@";
+$charsArray = preg_split('//u', $chars, null, PREG_SPLIT_NO_EMPTY);
+
+$cCount = count($charsArray);
+
+for ($y = 0; $y <= $height - $scale; $y += $scale) {
+    for ($x = 0; $x <= $width - $scale; $x += ($scale / 2)) {
+        $rgb = imagecolorat($img, $x, $y);
+        $r = ($rgb >> 16) & 0xFF;
+        $g = ($rgb >> 8) & 0xFF;
+        $b = $rgb & 0xFF;
+
+        // Calculate luminance
+        $luminance = ($r + $g + $b) / (255 * 3);
+        // Map luminance to character index
+        $charIndex = (int)(($cCount - 1) * $luminance);
+        echo $charsArray[$charIndex];
+    }
+    echo PHP_EOL;
+}
+
+?>
