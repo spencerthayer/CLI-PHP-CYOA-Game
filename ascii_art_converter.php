@@ -25,7 +25,8 @@ $scale = 8; // Adjust scale for resolution
 
 // Comprehensive character set for better shading
 $alphachars = " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#\$Bg0MNWQ%&@";
-$blockchars = " ▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐▔▕▖▗▘▙▚▛▜▝▞▟░▒▓";
+// $blockchars = " ▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐▔▕▖▗▘▙▚▛▜▝▞▟░▒▓";
+$blockchars = " ░▒▓█";
 $chars = $blockchars;
 $charsArray = preg_split('//u', $chars, -1, PREG_SPLIT_NO_EMPTY);
 
