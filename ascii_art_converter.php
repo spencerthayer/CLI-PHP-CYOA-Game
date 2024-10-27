@@ -24,10 +24,14 @@ list($width, $height) = getimagesize($file);
 $scale = 8; // Adjust scale for resolution
 
 // Comprehensive character set for better shading
-$chars = " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#\$Bg0MNWQ%&@";
+// Comprehensive character set for better shading
+// $chars = " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#\$Bg0MNWQ%&@░▒▓█";
+$chars = " ▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐▔▕▖▗▘▙▚▛▜▝▞▟░▒▓";
 $charsArray = preg_split('//u', $chars, -1, PREG_SPLIT_NO_EMPTY);
 
 $cCount = count($charsArray);
+
+$ascii_art = "";
 
 for ($y = 0; $y <= $height - $scale; $y += $scale) {
     for ($x = 0; $x <= $width - $scale; $x += ($scale / 2)) {
@@ -40,9 +44,11 @@ for ($y = 0; $y <= $height - $scale; $y += $scale) {
         $luminance = ($r + $g + $b) / (255 * 3);
         // Map luminance to character index
         $charIndex = (int)(($cCount - 1) * $luminance);
-        echo $charsArray[$charIndex];
+        $ascii_art .= $charsArray[$charIndex];
     }
-    echo PHP_EOL;
+    $ascii_art .= PHP_EOL;
 }
+
+echo $ascii_art;
 
 ?>

@@ -7,7 +7,8 @@ if (php_sapi_name() !== 'cli') {
 // Paths to store the API key and game history securely
 $api_key_file = __DIR__ . '/.openai_api_key';
 $game_history_file = __DIR__ . '/.game_history';
-$debugging = true;
+// $debugging = true;
+$debugging = in_array('--debug', $argv);
 
 // Function to get the API key
 function get_api_key($api_key_file) {
@@ -64,7 +65,7 @@ function generate_ascii_art($image_path) {
     // Path to the ASCII art converter script
     $script_path = __DIR__ . '/ascii_art_converter.php';
     // Execute the script and capture the output
-    $output = shell_exec("php $script_path " . escapeshellarg($image_path));
+    $output = shell_exec("php " . escapeshellarg($script_path) . " " . escapeshellarg($image_path));
     return $output;
 }
 
@@ -122,11 +123,57 @@ function generate_image($prompt, $api_key) {
 }
 
 // Add debugging output function
-function debug($message) {
+function debug_log($message) {
     global $debugging;
     if ($debugging) {
         echo "[DEBUG] " . $message . "\n";
     }
+}
+
+// Function to generate an image from the assistant's text
+function process_image_from_text($text, $api_key) {
+    global $debugging;
+
+    // Generate a summarized version of the text to create an effective image prompt
+    $prompt = generate_image_prompt_summary($text);
+
+    if ($debugging) {
+        echo "[DEBUG] Attempting to generate an image with prompt: '$prompt'\n";
+    }
+
+    $image_url = generate_image($prompt, $api_key);
+
+    if ($image_url) {
+        if ($debugging) {
+            echo "[DEBUG] Image generated successfully. URL: $image_url\n";
+        }
+        $image_data = file_get_contents($image_url);
+        if ($image_data === false) {
+            echo "Error downloading image from URL.\n";
+            return "";
+        }
+        $image_path = __DIR__ . '/images/temp_image.jpg';
+        file_put_contents($image_path, $image_data);
+
+        $ascii_art = generate_ascii_art($image_path);
+
+        unlink($image_path);
+
+        return $ascii_art;
+    } else {
+        if ($debugging) {
+            echo "[DEBUG] Failed to generate image from text.\n";
+        }
+        return "";
+    }
+}
+
+// Function to generate an image prompt from the assistant's text
+function generate_image_prompt_summary($text) {
+    // Extract meaningful content for image generation, using the first couple of sentences or main descriptive parts
+    $sentences = explode('.', $text);
+    $prompt = implode('. ', array_slice($sentences, 0, 2));
+    return trim($prompt);
 }
 
 // Get the API key
@@ -153,7 +200,13 @@ Ensure that the storyline is engaging and that the player's choices have meaning
 
 // Load the conversation history or start a new game
 if (file_exists($game_history_file)) {
-    $saved_conversation = json_decode(file_get_contents($game_history_file), true);
+    $history_content = file_get_contents($game_history_file);
+    if ($history_content === false) {
+        echo "Error: Unable to read the game history file.\n";
+        exit(1);
+    }
+
+    $saved_conversation = json_decode($history_content, true);
     if ($saved_conversation && is_array($saved_conversation) && count($saved_conversation) > 0) {
         $conversation = $saved_conversation;
 
@@ -173,6 +226,8 @@ if (file_exists($game_history_file)) {
 
             echo colorize($last_assistant_message);
 
+            debug_log("Loaded conversation: " . json_encode($conversation));
+
             $skip_api_call = true;
         } else {
             echo colorize("[bold][green]Starting a new adventure in 'The Quest of the Forgotten Realm'![/green][/bold]\n");
@@ -180,6 +235,8 @@ if (file_exists($game_history_file)) {
 
             $conversation = [];
             $conversation[] = ['role' => 'system', 'content' => $system_prompt];
+
+            debug_log("Starting new conversation: " . json_encode($conversation));
         }
     } else {
         echo colorize("[bold][green]Starting a new adventure in 'The Quest of the Forgotten Realm'![/green][/bold]\n");
@@ -187,12 +244,16 @@ if (file_exists($game_history_file)) {
 
         $conversation = [];
         $conversation[] = ['role' => 'system', 'content' => $system_prompt];
+
+        debug_log("Starting new conversation: " . json_encode($conversation));
     }
 } else {
     echo colorize("[bold][green]Welcome to 'The Quest of the Forgotten Realm'![/green][/bold]\n");
     echo "(Type 'exit' or 'quit' to end the game at any time.)\n";
 
     $conversation[] = ['role' => 'system', 'content' => $system_prompt];
+
+    debug_log("Starting new conversation: " . json_encode($conversation));
 }
 
 // Ensure the images directory exists
@@ -201,53 +262,20 @@ if (!is_dir($images_dir)) {
     mkdir($images_dir, 0755, true);
 }
 
-// Function to generate an image from the assistant's text
-function process_image_from_text($text, $api_key) {
-    global $debugging;
-
-    // Generate a summarized version of the text to create an effective image prompt
-    $prompt = generate_image_prompt_summary($text);
-
-    if ($debugging) {
-        echo "[DEBUG] Attempting to generate an image with prompt: '$prompt'\n";
-    }
-
-    $image_url = generate_image($prompt, $api_key);
-
-    if ($image_url) {
-        if ($debugging) {
-            echo "[DEBUG] Image generated successfully. URL: $image_url\n";
-        }
-        $image_data = file_get_contents($image_url);
-        $image_path = __DIR__ . '/images/temp_image.jpg';
-        file_put_contents($image_path, $image_data);
-
-        $ascii_art = generate_ascii_art($image_path);
-
-        unlink($image_path);
-
-        return $ascii_art;
-    } else {
-        if ($debugging) {
-            echo "[DEBUG] Failed to generate image from text.\n";
-        }
-        return "";
-    }
-}
-
-// Function to generate an image prompt from the assistant's text
-function generate_image_prompt_summary($text) {
-    // Extract meaningful content for image generation, using the first couple of sentences or main descriptive parts
-    $sentences = explode('.', $text);
-    $prompt = implode('. ', array_slice($sentences, 0, 2));
-    return trim($prompt);
-}
-
 // Main game loop
+$max_iterations = 1000; // Prevent infinite loops
+$current_iteration = 0;
+
 while (true) {
+    if ($current_iteration++ >= $max_iterations) {
+        echo "Reached maximum number of iterations. Exiting to prevent infinite loop.\n";
+        break;
+    }
+
     if (!isset($skip_api_call) || !$skip_api_call) {
         if (empty($conversation)) {
             $conversation[] = ['role' => 'system', 'content' => $system_prompt];
+            debug_log("Conversation was empty. Added system prompt.");
         }
 
         $data = [
@@ -257,7 +285,7 @@ while (true) {
             'temperature' => 0.8,
         ];
 
-        debug("Sending request to GPT-4o-mini: " . json_encode($data));
+        debug_log("Sending request to GPT-4o-mini: " . json_encode($data));
 
         $ch = curl_init($chat_url);
 
@@ -279,12 +307,14 @@ while (true) {
 
         curl_close($ch);
 
-        debug("Response from GPT-4o-mini: " . $response);
+        debug_log("Response from GPT-4o-mini: " . $response);
 
         $result = json_decode($response, true);
 
         if (isset($result['choices'][0]['message']['content'])) {
             $reply = $result['choices'][0]['message']['content'];
+
+            debug_log("Assistant reply: $reply");
 
             $reply_colored = colorize($reply);
             echo "\n" . $reply_colored . "\n";
@@ -297,8 +327,14 @@ while (true) {
 
             $conversation[] = ['role' => 'assistant', 'content' => $reply];
 
-            file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
+            $write_success = file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
+            if ($write_success === false) {
+                echo "Error: Unable to write to the game history file.\n";
+                exit(1);
+            }
             chmod($game_history_file, 0600);
+
+            debug_log("Updated conversation after assistant reply: " . json_encode($conversation));
         } else {
             echo "Error in API response.\n";
             if (isset($result['error']['message'])) {
@@ -307,20 +343,34 @@ while (true) {
             break;
         }
     } else {
+        debug_log("Skipping API call as per flag.");
         unset($skip_api_call);
     }
 
     echo colorize("\n[cyan]Your action (enter the number of your choice): [/cyan]");
     $user_input = trim(fgets(STDIN));
 
+    debug_log("User input received: $user_input");
+
     if (strtolower($user_input) == 'exit' || strtolower($user_input) == 'quit') {
         echo colorize("\n[bold][yellow]Thank you for playing 'The Quest of the Forgotten Realm'![/yellow][/bold]\n");
         break;
     }
 
+    // Validate user input
+    if (!preg_match('/^[1-4]$/', $user_input)) {
+        echo colorize("[red]Invalid input. Please enter a number between 1 and 4.[/red]\n");
+        continue;
+    }
+
     $conversation[] = ['role' => 'user', 'content' => $user_input];
 
-    file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
+    debug_log("Updated conversation after user input: " . json_encode($conversation));
+
+    $write_success = file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
+    if ($write_success === false) {
+        echo "Error: Unable to write to the game history file.\n";
+        exit(1);
+    }
     chmod($game_history_file, 0600);
 }
-?>
