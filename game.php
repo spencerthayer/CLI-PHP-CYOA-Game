@@ -204,7 +204,9 @@ if (!is_dir($images_dir)) {
 // Function to generate an image from the assistant's text
 function process_image_from_text($text, $api_key) {
     global $debugging;
-    $prompt = generate_image_prompt($text);
+
+    // Generate a summarized version of the text to create an effective image prompt
+    $prompt = generate_image_prompt_summary($text);
 
     if ($debugging) {
         echo "[DEBUG] Attempting to generate an image with prompt: '$prompt'\n";
@@ -224,24 +226,21 @@ function process_image_from_text($text, $api_key) {
 
         unlink($image_path);
 
-        $text_with_image = $ascii_art . "\n\n" . $text;
-
-        return $text_with_image;
+        return $ascii_art;
     } else {
         if ($debugging) {
             echo "[DEBUG] Failed to generate image from text.\n";
         }
-        return $text;
+        return "";
     }
 }
 
 // Function to generate an image prompt from the assistant's text
-function generate_image_prompt($text) {
+function generate_image_prompt_summary($text) {
+    // Extract meaningful content for image generation, using the first couple of sentences or main descriptive parts
     $sentences = explode('.', $text);
-    $first_sentence = $sentences[0];
-    $prompt = trim($first_sentence);
-
-    return $prompt;
+    $prompt = implode('. ', array_slice($sentences, 0, 2));
+    return trim($prompt);
 }
 
 // Main game loop
@@ -254,7 +253,7 @@ while (true) {
         $data = [
             'model' => 'gpt-4o-mini',
             'messages' => $conversation,
-            'max_tokens' => 1000,
+            'max_tokens' => 500,
             'temperature' => 0.8,
         ];
 
@@ -287,19 +286,14 @@ while (true) {
         if (isset($result['choices'][0]['message']['content'])) {
             $reply = $result['choices'][0]['message']['content'];
 
-            if (stripos($reply, "I cannot generate images") !== false) {
-                debug("Removing unwanted text about inability to generate images.");
-                $reply = str_ireplace("I'm sorry, but I cannot generate images directly.", "", $reply);
-            }
-
-            if (stripos($reply, '[generate image]') !== false) {
-                $reply = str_replace('[generate image]', '', $reply);
-                $reply = process_image_from_text($reply, $api_key);
-            }
-
             $reply_colored = colorize($reply);
-
             echo "\n" . $reply_colored . "\n";
+
+            // Generate an image based on the assistant's response
+            $ascii_art = process_image_from_text($reply, $api_key);
+            if (!empty($ascii_art)) {
+                echo "\n" . $ascii_art . "\n";
+            }
 
             $conversation[] = ['role' => 'assistant', 'content' => $reply];
 

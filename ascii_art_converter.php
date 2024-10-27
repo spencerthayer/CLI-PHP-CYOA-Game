@@ -3,19 +3,19 @@
 if (isset($argv[1]) && strlen($argv[1])) {
     $file = $argv[1];
 } else {
-    echo 'Please specify an image file.';
+    echo 'Please specify an image file.' . PHP_EOL;
     exit(1);
 }
 
 // Check if the file exists
 if (!file_exists($file)) {
-    echo 'File not found: ' . $file;
+    echo 'File not found: ' . $file . PHP_EOL;
     exit(1);
 }
 
-$img = imagecreatefromstring(file_get_contents($file));
+$img = @imagecreatefromstring(file_get_contents($file));
 if (!$img) {
-    echo 'Unsupported image type or unable to open image.';
+    echo 'Unsupported image type or unable to open image.' . PHP_EOL;
     exit(1);
 }
 
@@ -24,8 +24,8 @@ list($width, $height) = getimagesize($file);
 $scale = 8; // Adjust scale for resolution
 
 // Comprehensive character set for better shading
-$chars = " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#$Bg0MNWQ%&@";
-$charsArray = preg_split('//u', $chars, null, PREG_SPLIT_NO_EMPTY);
+$chars = " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#\$Bg0MNWQ%&@";
+$charsArray = preg_split('//u', $chars, -1, PREG_SPLIT_NO_EMPTY);
 
 $cCount = count($charsArray);
 
