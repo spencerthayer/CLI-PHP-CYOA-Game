@@ -10,7 +10,7 @@ $game_history_file = __DIR__ . '/.game_history';
 $debugging = in_array('--debug', $argv);
 $chat_url = 'https://api.openai.com/v1/chat/completions';
 
-// Create a new game.
+// 1. Function to create a new game by checking for the '--new' flag
 function check_for_new_game($argv, $game_history_file) {
     if (in_array('--new', $argv)) {
         if (file_exists($game_history_file)) {
@@ -23,7 +23,7 @@ function check_for_new_game($argv, $game_history_file) {
 }
 check_for_new_game($argv, $game_history_file);
 
-// Function to get the API key
+// 2. Function to get the API key
 function get_api_key($api_key_file) {
     if (file_exists($api_key_file)) {
         $api_key = trim(file_get_contents($api_key_file));
@@ -38,7 +38,7 @@ function get_api_key($api_key_file) {
     return $api_key;
 }
 
-// Function to apply ANSI color codes
+// 3. Function to apply ANSI color codes
 function colorize($text) {
     $color_codes = [
         '[red]' => "\033[31m",
@@ -57,7 +57,7 @@ function colorize($text) {
     return str_replace(array_keys($color_codes), array_values($color_codes), $text);
 }
 
-// Function to generate ASCII art from an image
+// 4. Function to generate ASCII art from an image
 function generate_ascii_art($image_path) {
     global $debugging;
     if ($debugging) {
@@ -68,7 +68,7 @@ function generate_ascii_art($image_path) {
     return $output;
 }
 
-// Function to generate an image using DALL·E 2
+// 5. Function to generate an image using DALL·E 2
 function generate_image($prompt, $api_key) {
     global $debugging;
     $url = 'https://api.openai.com/v1/images/generations';
@@ -110,7 +110,7 @@ function generate_image($prompt, $api_key) {
     }
 }
 
-// Debugging output function
+// 6. Debugging output function
 function debug_log($message) {
     global $debugging;
     if ($debugging) {
@@ -118,7 +118,7 @@ function debug_log($message) {
     }
 }
 
-// Function to generate an image from the assistant's text
+// 7. Function to generate an image from the assistant's text
 function process_image_from_text($text, $api_key) {
     global $debugging;
     $prompt = generate_image_prompt_summary($text);
@@ -148,29 +148,32 @@ function process_image_from_text($text, $api_key) {
     }
 }
 
-// Function to generate an image prompt from the assistant's text
+// 8. Function to generate an image prompt from the assistant's text
 function generate_image_prompt_summary($text) {
     $sentences = explode('.', $text);
     $prompt = implode('. ', array_slice($sentences, 0, 2));
     return trim($prompt);
 }
 
-// Function to process the scene and generate image
+// 9. Function to process the scene and generate image
 function process_scene($scene_data, $api_key) {
     global $debugging;
     echo "\n" . colorize($scene_data->narrative) . "\n\n";
-    $image_prompt = "Low-res greyscale 8bit: " . $scene_data->image;
-    $ascii_art = process_image_from_text($image_prompt, $api_key);
-    if (!empty($ascii_art)) {
-        echo "\n" . $ascii_art . "\n";
-    }
+    
     echo colorize("\n[bold]Choose your next action:[/bold]\n");
     foreach ($scene_data->options as $index => $option) {
         $number = $index + 1;
         echo colorize("[cyan]{$number}. {$option}[/cyan]\n");
     }
+    
+    // Add additional options
+    echo "\n"; // Add spacing
+    echo colorize("[cyan](g) Generate an image of this scene[/cyan]\n");
+    echo colorize("[cyan](q) Quit the game[/cyan]\n");
+    echo colorize("[cyan](n) Start a new game[/cyan]\n");
 }
 
+// 10. Updated system prompt
 $system_prompt = "
 You are an interactive text-based adventure game called 'The Quest of the Forgotten Realm'.
 
@@ -181,7 +184,7 @@ In each scene, provide a vivid and immersive description of the surroundings, in
 You must ALWAYS provide exactly 4 options for the player to choose from. Each option should be a single sentence with 1-2 relevant emojis.
 ";
 
-// Define the structured output format without unsupported validations
+// 11. Define the structured output format without unsupported validations
 $response_format = [
     "type" => "json_schema",
     "json_schema" => [
@@ -212,13 +215,13 @@ $response_format = [
     ]
 ];
 
-// Get the API key
+// 12. Get the API key
 $api_key = get_api_key($api_key_file);
 
-// Initialize the conversation history
+// 13. Initialize the conversation history
 $conversation = [];
 
-// Load the conversation history or start a new game
+// 14. Load the conversation history or start a new game
 if (file_exists($game_history_file)) {
     $history_content = file_get_contents($game_history_file);
     if ($history_content === false) {
@@ -247,6 +250,7 @@ if (file_exists($game_history_file)) {
                 echo colorize("[red]Error: Corrupted game history. Starting a new game.[/red]\n");
                 $conversation = [];
                 $conversation[] = ['role' => 'system', 'content' => $system_prompt];
+                debug_log("Corrupted game history. Starting new conversation.");
             }
         }
     } else {
@@ -261,29 +265,37 @@ if (file_exists($game_history_file)) {
     $conversation[] = ['role' => 'system', 'content' => $system_prompt];
 }
 
-// Ensure the images directory exists
+// 15. Ensure the images directory exists
 $images_dir = __DIR__ . '/images';
 if (!is_dir($images_dir)) {
     mkdir($images_dir, 0755, true);
 }
 
-// Main game loop
+// 16. Main game loop
 $max_iterations = 1000; // Prevent infinite loops
 $current_iteration = 0;
+
+// Initialize scene_data for image generation
+$scene_data = null;
 
 while (true) {
     if ($current_iteration++ >= $max_iterations) {
         echo "Reached maximum number of iterations. Exiting.\n";
         break;
     }
+
     if (!isset($skip_api_call) || !$skip_api_call) {
         $data = [
             'model' => 'gpt-4o-mini',
             'messages' => $conversation,
-            'response_format' => $response_format,
+            'max_tokens' => 1000, // Reintroduced max_tokens
             'temperature' => 0.8,
+            'response_format' => $response_format, // Keeping response_format as per instructions
         ];
+
         debug_log("Sending request to GPT-4o-mini: " . json_encode($data));
+
+        // Make the API call
         $ch = curl_init($chat_url);
         curl_setopt_array($ch, [
             CURLOPT_POST => 1,
@@ -305,9 +317,18 @@ while (true) {
             $scene_data = json_decode($result->choices[0]->message->content);
             if ($scene_data && isset($scene_data->narrative, $scene_data->options, $scene_data->image)) {
                 process_scene($scene_data, $api_key);
-                $conversation[] = ['role' => 'assistant', 'content' => $result->choices[0]->message->content];
-                file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
+                // Save to conversation history
+                $conversation[] = [
+                    'role' => 'assistant',
+                    'content' => $result->choices[0]->message->content
+                ];
+                $write_success = file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
+                if ($write_success === false) {
+                    echo "Error: Unable to write to the game history file.\n";
+                    exit(1);
+                }
                 chmod($game_history_file, 0600);
+                debug_log("Updated conversation after assistant reply: " . json_encode($conversation));
             } else {
                 echo colorize("[red]Error: Received improperly formatted scene data from the assistant.[/red]\n");
                 break;
@@ -319,20 +340,78 @@ while (true) {
             }
             break;
         }
+    } else {
+        debug_log("Skipping API call as per flag.");
+        unset($skip_api_call);
     }
-    echo colorize("\n[cyan]Your choice (1-4, or 'exit'): [/cyan]");
+
+    // Handle user input
+    echo colorize("\n[cyan]Your choice (1-4, 'g' for image, 'q' to quit, 'n' for new game): [/cyan]");
     $user_input = trim(fgets(STDIN));
     debug_log("User input received: $user_input");
-    if (strtolower($user_input) == 'exit' || strtolower($user_input) == 'quit') {
+
+    // Handle special commands first
+    if (strtolower($user_input) == 'q') {
         echo colorize("\n[bold][yellow]Thank you for playing 'The Quest of the Forgotten Realm'![/yellow][/bold]\n");
         break;
     }
-    if (!preg_match('/^[1-4]$/', $user_input)) {
-        echo colorize("[red]Invalid input. Please enter a number between 1 and 4.[/red]\n");
+
+    if (strtolower($user_input) == 'n') {
+        echo colorize("\n[bold][yellow]Starting a new game...[/yellow][/bold]\n");
+        $conversation = [];
+        $conversation[] = ['role' => 'system', 'content' => $system_prompt];
+        // Remove existing game history
+        if (file_exists($game_history_file)) {
+            unlink($game_history_file);
+            debug_log("Game history file deleted for new game.");
+        }
         continue;
     }
+
+    if (strtolower($user_input) == 'g') {
+        if ($scene_data) {
+            echo colorize("\n[bold][yellow]Generating image for the current scene...[/yellow][/bold]\n");
+            $image_prompt = "Low-res greyscale 8bit: " . $scene_data->image;
+            $ascii_art = process_image_from_text($image_prompt, $api_key);
+            if (!empty($ascii_art)) {
+                echo "\n" . $ascii_art . "\n\n";
+                // Redisplay the current scene narrative and options
+                echo colorize($scene_data->narrative) . "\n\n";
+                echo colorize("\n[bold]Choose your next action:[/bold]\n");
+                foreach ($scene_data->options as $index => $option) {
+                    $number = $index + 1;
+                    echo colorize("[cyan]{$number}. {$option}[/cyan]\n");
+                }
+                // Add additional options
+                echo "\n";
+                echo colorize("[cyan](g) Generate an image of this scene[/cyan]\n");
+                echo colorize("[cyan](q) Quit the game[/cyan]\n");
+                echo colorize("[cyan](n) Start a new game[/cyan]\n");
+            }
+        } else {
+            echo colorize("[red]No scene data available to generate an image.[/red]\n");
+        }
+        // Skip the rest of the loop and go back to getting input
+        unset($skip_api_call);  // Make sure we don't skip the next API call when needed
+        continue;
+    }
+
+    // Handle regular number inputs
+    if (!preg_match('/^[1-4]$/', $user_input)) {
+        echo colorize("[red]Invalid input. Please enter a number between 1-4, 'g' for image, 'q' to quit, or 'n' for new game.[/red]\n");
+        continue;
+    }
+
+    // Process valid number input
     $conversation[] = ['role' => 'user', 'content' => $user_input];
-    file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
+    debug_log("Updated conversation after user input: " . json_encode($conversation));
+
+    // Save the updated conversation history
+    $write_success = file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
+    if ($write_success === false) {
+        echo "Error: Unable to write to the game history file.\n";
+        exit(1);
+    }
     chmod($game_history_file, 0600);
 }
 ?>
