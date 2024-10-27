@@ -21,12 +21,15 @@ if (!$img) {
 
 list($width, $height) = getimagesize($file);
 
-$scale = 8; // Adjust scale for resolution
+// ASCII characters are typically taller than they are wide in most fonts
+// We'll use this to adjust our sampling to maintain aspect ratio
+$char_aspect = 2.5; // Typical terminal character aspect ratio (height/width)
+$scale = 2; // Base scale for sampling
 
 // Comprehensive character set for better shading
 $alphachars = " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#\$Bg0MNWQ%&@";
-// $blockchars = " ▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐▔▕▖▗▘▙▚▛▜▝▞▟░▒▓";
 $blockchars = " ░▒▓█";
+$morechars = " ▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐▔▕▖▗▘▙▚▛▜▝▞▟░▒▓";
 $chars = $blockchars;
 $charsArray = preg_split('//u', $chars, -1, PREG_SPLIT_NO_EMPTY);
 
@@ -34,8 +37,12 @@ $cCount = count($charsArray);
 
 $ascii_art = "";
 
-for ($y = 0; $y <= $height - $scale; $y += $scale) {
-    for ($x = 0; $x <= $width - $scale; $x += ($scale / 2)) {
+// Adjust x_scale to account for character aspect ratio
+$x_scale = $scale;
+$y_scale = $scale * $char_aspect;
+
+for ($y = 0; $y <= $height - $y_scale; $y += $y_scale) {
+    for ($x = 0; $x <= $width - $x_scale; $x += $x_scale) {
         $rgb = imagecolorat($img, $x, $y);
         $r = ($rgb >> 16) & 0xFF;
         $g = ($rgb >> 8) & 0xFF;
