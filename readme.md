@@ -1,17 +1,20 @@
 # The Quest of the Forgotten Realm
 
-Welcome to **The Quest of the Forgotten Realm**, an interactive text-based adventure game that runs in your command-line interface (CLI). This game leverages OpenAI's ChatGPT API to provide a dynamic and immersive storytelling experience.
+Welcome to **The Quest of the Forgotten Realm**, an interactive text-based adventure game created during **Cascadia PHP 2024**. This project leverages OpenAI's ChatGPT and DALL·E 2 APIs to deliver a dynamic and immersive storytelling experience directly in your command-line interface (CLI). A heartfelt thank you to the organizers and participants of Cascadia PHP 2024 for inspiring and supporting this project!
 
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Usage](#usage)
+  - [Starting the Game](#starting-the-game)
+  - [Command-Line Options](#command-line-options)
 - [Gameplay Instructions](#gameplay-instructions)
 - [Security Considerations](#security-considerations)
 - [Troubleshooting](#troubleshooting)
 - [Customization](#customization)
 - [License](#license)
+- [Credits](#credits)
 
 ---
 
@@ -19,12 +22,23 @@ Welcome to **The Quest of the Forgotten Realm**, an interactive text-based adven
 
 Before you begin, ensure you have met the following requirements:
 
-- **PHP 7.4 or higher** is installed on your system.
-  - Check your PHP version by running `php -v` in your command line.
+- **PHP 7.4 or Higher** is installed on your system.
+  - Check your PHP version by running:
+    ```bash
+    php -v
+    ```
   - If PHP is not installed, download it from the [official website](https://www.php.net/downloads.php) or use a package manager.
-- An **OpenAI API key**.
+
+- An **OpenAI API Key**.
   - Sign up at [OpenAI's website](https://platform.openai.com/signup/) if you don't have an account.
   - Generate an API key from your [API keys page](https://platform.openai.com/account/api-keys).
+
+- **Git** installed (optional, for cloning the repository).
+  - Check if Git is installed by running:
+    ```bash
+    git --version
+    ```
+  - If not installed, download it from the [official website](https://git-scm.com/downloads) or use a package manager.
 
 ---
 
@@ -35,53 +49,94 @@ Before you begin, ensure you have met the following requirements:
    Clone the GitHub repository to your local machine using the following command:
 
    ```bash
-   git clone https://github.com/yourusername/your-repo-name.git
+   git clone https://github.com/yourusername/quest-of-the-forgotten-realm.git
    ```
 
-   Replace `yourusername/your-repo-name` with the actual GitHub username and repository name.
+   Replace `yourusername/quest-of-the-forgotten-realm` with the actual GitHub username and repository name.
 
 2. **Navigate to the Project Directory**
 
    ```bash
-   cd your-repo-name
+   cd quest-of-the-forgotten-realm
    ```
+
+3. **Ensure Dependencies Are Met**
+
+   - The project relies on PHP's `curl` and `gd` extensions.
+   - Verify they are installed by running:
+     ```bash
+     php -m | grep -E 'curl|gd'
+     ```
+   - If not installed, refer to your operating system's package manager or PHP installation guide to add these extensions.
+
+4. **Create Necessary Directories**
+
+   The game will automatically create an `images` directory for temporary image storage. Ensure the PHP process has permissions to create directories in the project path.
 
 ---
 
 ## Usage
 
-### Running the Game
+### Starting the Game
 
-1. **Start the Game**
+Run the `game.php` script using PHP:
 
-   Run the `game.php` script using PHP:
+```bash
+php game.php
+```
 
-   ```bash
-   php game.php
-   ```
+**First-Time Setup:**
 
-2. **Enter Your OpenAI API Key**
+- Upon the first run, you'll be prompted to enter your OpenAI API key:
 
-   - **First-Time Setup:**
+  ```
+  Please enter your OpenAI API key:
+  ```
 
-     The script will prompt you to enter your OpenAI API key:
+  - Paste your API key and press **Enter**.
+  - The API key will be saved securely in a hidden file named `.openai_api_key` with permissions set to `0600` (readable and writable only by you).
 
-     ```
-     Please enter your OpenAI API key:
-     ```
+**Subsequent Runs:**
 
-     - Paste your API key and press **Enter**.
-     - The API key will be saved securely in a hidden file for future use.
+- The script will automatically use the saved API key without prompting.
 
-   - **Subsequent Runs:**
+### Command-Line Options
 
-     - The script will use the saved API key automatically.
+- **Start a New Game**
 
-### Gameplay Instructions
+  To start a new game and clear any existing game history, use the `--new` flag:
+
+  ```bash
+  php game.php --new
+  ```
+
+  - This will delete the `.game_history` file if it exists and start a fresh adventure.
+
+- **Enable Debugging**
+
+  For detailed debug logs, use the `--debug` flag:
+
+  ```bash
+  php game.php --debug
+  ```
+
+  - This will display internal processing messages, helpful for troubleshooting or understanding the game's operations.
+
+- **Combine Flags**
+
+  You can combine both flags as needed:
+
+  ```bash
+  php game.php --new --debug
+  ```
+
+---
+
+## Gameplay Instructions
 
 - **Game Start**
 
-  After entering your API key, the game will display a welcome message:
+  After launching the game, you'll receive a welcome message:
 
   ```
   Welcome to 'The Quest of the Forgotten Realm'!
@@ -90,21 +145,20 @@ Before you begin, ensure you have met the following requirements:
 
 - **Receiving Narration**
 
-  The game will provide vivid descriptions of the environment and scenarios.
+  The game will provide vivid descriptions of your surroundings, enriched with emojis to enhance visualization.
 
-- **Taking Actions**
+- **Making Choices**
 
-  When prompted with `Your action:`, type in what you want your character to do and press **Enter**.
+  When prompted with `Your choice (1-4, or 'exit'):`, enter the number corresponding to your desired action and press **Enter**.
 
-  - **Examples:**
-    - `explore the forest`
-    - `take the ancient book`
-    - `talk to the mysterious stranger`
-    - `cast a fire spell`
+  - **Example:**
+    ```
+    [cyan]Your choice (1-4, or 'exit'): [/cyan] 2
+    ```
 
 - **Exiting the Game**
 
-  Type `exit` or `quit` at any prompt to end the game.
+  At any prompt, type `exit` or `quit` to gracefully end your adventure.
 
 ---
 
@@ -112,12 +166,12 @@ Before you begin, ensure you have met the following requirements:
 
 - **API Key Storage**
 
-  - Your API key is stored in a hidden file named `.openai_api_key` in the project directory.
+  - Your OpenAI API key is stored in a hidden file named `.openai_api_key` in the project directory.
   - The file permissions are set to `0600`, making it readable and writable only by your user account.
+  - **Do Not Share:** Never share your API key or commit it to any public repository.
 
 - **Protecting Your API Key**
 
-  - **Do Not Share:** Never share your API key or commit it to any public repository.
   - **Revoking Access:** If you believe your API key has been compromised, revoke it immediately from your OpenAI account settings.
 
 - **File Permissions**
@@ -150,18 +204,21 @@ Before you begin, ensure you have met the following requirements:
 
    - **Error Message:** `SSL certificate problem: unable to get local issuer certificate`
    - **Solution:** Update your system's CA certificates or disable SSL verification (not recommended).
-
      ```php
      // Add this line before executing the API request
      curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
      ```
-
      **Warning:** Disabling SSL verification can expose you to security risks.
 
 5. **Permission Denied**
 
    - **Error Message:** `Permission denied` when accessing `.openai_api_key`
    - **Solution:** Ensure you have read/write permissions for the project directory and files.
+
+6. **API Schema Validation Errors**
+
+   - **Error Message:** `Invalid schema for response_format 'game_scene': In context=('properties', 'options'), 'minItems' is not permitted.`
+   - **Solution:** Ensure that the `minItems` and `maxItems` constraints are removed from the `response_format` schema in `game.php`. The latest refactored code provided above addresses this issue.
 
 ---
 
@@ -172,27 +229,28 @@ Before you begin, ensure you have met the following requirements:
   - Open `game.php` in a text editor.
   - Locate the `$system_prompt` variable.
   - Modify the prompt to change the game's setting or rules.
-
     ```php
     $system_prompt = "You are an interactive sci-fi adventure game set in space...";
     ```
 
 - **Adjusting API Parameters**
 
-  - Modify parameters like `max_tokens` and `temperature` in the `$data` array to change response length and creativity.
-
+  - Modify parameters like `temperature` in the `$data` array to change response creativity.
     ```php
-    'max_tokens' => 250,
     'temperature' => 0.9,
     ```
 
 - **Using a Different Model**
 
   - If you have access to GPT-4, you can change the model:
-
     ```php
-    'model' => 'gpt-4o-mini',
+    'model' => 'gpt-4',
     ```
+
+- **Enhancing ASCII Art Quality**
+
+  - Adjust the `$scale` variable in `ascii_art_converter.php` to change the resolution of the ASCII art.
+  - Experiment with different character sets to improve shading and detail.
 
 ---
 
@@ -204,6 +262,8 @@ This project is licensed under the [MIT License](LICENSE). You are free to use, 
 
 ## Credits
 
-This game was created by [me@spencerthayer.com](me@spencerthayer.com). 
+- **Developer:** [Spencer Thayer](mailto:me@spencerthayer.com)
+- **Contributor:** [nsbucky](mailto:kenrick@thebusypixel.com)
+- **Inspiration:** Cascadia PHP 2024
 
-I also participated, [nsbucky](kenrick@thebusypixel.com).
+Thank you to all the participants and organizers of Cascadia PHP 2024 for fostering a community of innovation and collaboration. Your support made this project possible!

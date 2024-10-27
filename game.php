@@ -171,8 +171,6 @@ function process_scene($scene_data, $api_key) {
     }
 }
 
-// Updated system prompt
-// $system_prompt = "You are an interactive text-based adventure game called 'The Quest of the Forgotten Realm'. Create immersive fantasy scenes with magic, dragons, and ancient mysteries. You must ALWAYS provide exactly 4 options for the player to choose from. Each option should be a single sentence with 1-2 relevant emojis.";
 $system_prompt = "
 You are an interactive text-based adventure game called 'The Quest of the Forgotten Realm'.
 
