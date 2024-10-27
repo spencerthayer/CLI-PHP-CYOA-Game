@@ -75,7 +75,7 @@ function generate_image($prompt, $api_key) {
     $url = 'https://api.openai.com/v1/images/generations';
 
     $data = [
-        'prompt' => $prompt,
+        'prompt' => 'Low-res greyscale 8-bit ANSI art of: ' . $prompt,
         'n' => 1,
         'size' => '256x256',
         'response_format' => 'url'

@@ -25,8 +25,8 @@ $scale = 8; // Adjust scale for resolution
 
 // Comprehensive character set for better shading
 // Comprehensive character set for better shading
-// $chars = " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#\$Bg0MNWQ%&@░▒▓█";
-$chars = " ▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐▔▕▖▗▘▙▚▛▜▝▞▟░▒▓";
+// $chars = " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#\$Bg0MNWQ%&@░▒▓█▁▂▃▄▅▆▇▊▎▍▌▋▉█";
+$chars = " -=#░▒▓█";
 $charsArray = preg_split('//u', $chars, -1, PREG_SPLIT_NO_EMPTY);
 
 $cCount = count($charsArray);
