@@ -37,7 +37,7 @@ $config = [
         'intensity' => 0.2   // Weight for mean intensity
     ],
     'random_factor' => 0,    // Factor to introduce randomness in character selection
-    'region_size' => 10       // Size of the local region for analysis (5x5)
+    'region_size' => 4       // Size of the local region for analysis (5x5)
 ];
 
 // Gamma correction function
@@ -182,7 +182,7 @@ class CharacterSelector {
             'preferred_chars' => 'block'
         ],
         'texture' => [
-            'weight' => 0.1,      // Reduced from 0.25 to de-emphasize texture
+            'weight' => 0.2,      // Reduced from 0.25 to de-emphasize texture
             'threshold' => 0.3,
             'preferred_chars' => 'alpha'
         ],
@@ -192,7 +192,7 @@ class CharacterSelector {
             'preferred_chars' => 'progressive'
         ],
         'smoothness' => [
-            'weight' => 0.6,      // Increased significantly to favor shading
+            'weight' => 0.75,      // Increased significantly to favor shading
             'threshold' => 0.1,
             'preferred_chars' => 'shade'
         ]
@@ -232,7 +232,8 @@ class CharacterSelector {
         ];
         
         // Alpha characters ordered by visual density
-        $alphaOrder = "`.'\",:;!i|Il()[]{}?-_+~<>iv^*";
+        // $alphaOrder = "`.'\",:;!i|Il()[]{}?-_+~<>iv^*";
+        $alphaOrder = "`.-'\":_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#\$Bg0MNWQ%&@";
         $this->alphachars = array_map(function($char) use ($alphaOrder) {
             $weight = (strpos($alphaOrder, $char) + 1) / strlen($alphaOrder);
             return ['char' => $char, 'weight' => $weight];
