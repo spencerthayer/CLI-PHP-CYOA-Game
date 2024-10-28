@@ -39,7 +39,7 @@ $cCount = count($charsArray);
 
 // Gamma correction function
 function applyGamma($luminance, $gamma = 1.2) {
-    return pow($luminance, 1 / $gamma);
+    return pow($luminance, 0.2 / $gamma);
 }
 
 // Function to convert RGB to XYZ

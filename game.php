@@ -10,7 +10,7 @@ $game_history_file = __DIR__ . '/.game_history';
 $debugging = in_array('--debug', $argv);
 $chat_url = 'https://api.openai.com/v1/chat/completions';
 
-// 1. Function to create a new game by checking for the '--new' flag
+// Function to create a new game by checking for the '--new' flag
 function check_for_new_game($argv, $game_history_file) {
     if (in_array('--new', $argv)) {
         if (file_exists($game_history_file)) {
@@ -23,7 +23,7 @@ function check_for_new_game($argv, $game_history_file) {
 }
 check_for_new_game($argv, $game_history_file);
 
-// 2. Function to get the API key
+// Function to get the API key
 function get_api_key($api_key_file) {
     if (file_exists($api_key_file)) {
         $api_key = trim(file_get_contents($api_key_file));
@@ -38,7 +38,7 @@ function get_api_key($api_key_file) {
     return $api_key;
 }
 
-// 3. Function to apply ANSI color codes
+// Function to apply ANSI color codes
 function colorize($text) {
     $color_codes = [
         '[red]' => "\033[31m",
@@ -57,7 +57,7 @@ function colorize($text) {
     return str_replace(array_keys($color_codes), array_values($color_codes), $text);
 }
 
-// 4. Function to generate ASCII art from an image
+// Function to generate ASCII art from an image
 function generate_ascii_art($image_path) {
     global $debugging;
     if ($debugging) {
@@ -68,49 +68,28 @@ function generate_ascii_art($image_path) {
     return $output;
 }
 
-// 5. Function to generate an image using DALL·E 2
-function generate_image($prompt, $api_key) {
+// Function to generate an image using Pollinations.ai with a reproducible seed
+function generate_image($prompt, $seed) {
     global $debugging;
-    $url = 'https://api.openai.com/v1/images/generations';
-    $data = [
-        'prompt' => $prompt,
-        'n' => 1,
-        'size' => '256x256',
-        'response_format' => 'url'
-    ];
+    $prompt_url = urlencode("low-res 8bit ANSI art: $prompt");
+    $url = "https://image.pollinations.ai/prompt/$prompt_url?model=flux&nologo=true&width=256&height=192&seed=$seed";
+
     if ($debugging) {
-        echo "[DEBUG] Sending request to DALL·E 2 API with prompt: $prompt\n";
+        echo "[DEBUG] Generated Pollinations URL: $url\n";
     }
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_POST, 1);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Content-Type: application/json',
-        'Authorization: Bearer ' . $api_key,
-    ]);
-    $response = curl_exec($ch);
-    if (curl_errno($ch)) {
-        echo 'DALL·E Request Error: ' . curl_error($ch) . "\n";
+    
+    $image_data = file_get_contents($url);
+    if ($image_data === false) {
+        echo "Error downloading image from Pollinations.ai.\n";
         return null;
     }
-    curl_close($ch);
-    if ($debugging) {
-        echo "[DEBUG] Response from DALL·E 2 API: $response\n";
-    }
-    $result = json_decode($response, true);
-    if (isset($result['data'][0]['url'])) {
-        return $result['data'][0]['url'];
-    } else {
-        echo "Error generating image with DALL·E.\n";
-        if (isset($result['error']['message'])) {
-            echo "DALL·E Error Message: " . $result['error']['message'] . "\n";
-        }
-        return null;
-    }
+    
+    $image_path = __DIR__ . "/images/temp_image_$seed.jpg";
+    file_put_contents($image_path, $image_data);
+    return generate_ascii_art($image_path); // Convert to ASCII art using the image
 }
 
-// 6. Debugging output function
+// Debugging output function
 function debug_log($message) {
     global $debugging;
     if ($debugging) {
@@ -118,43 +97,25 @@ function debug_log($message) {
     }
 }
 
-// 7. Function to generate an image from the assistant's text
-function process_image_from_text($text, $api_key) {
+// Function to generate an image from the assistant's text
+function process_image_from_text($text, $seed) {
     global $debugging;
     $prompt = generate_image_prompt_summary($text);
     if ($debugging) {
-        echo "[DEBUG] Attempting to generate an image with prompt: '$prompt'\n";
+        echo "[DEBUG] Attempting to generate an image with prompt: '$prompt' and seed: $seed\n";
     }
-    $image_url = generate_image($prompt, $api_key);
-    if ($image_url) {
-        if ($debugging) {
-            echo "[DEBUG] Image generated successfully. URL: $image_url\n";
-        }
-        $image_data = file_get_contents($image_url);
-        if ($image_data === false) {
-            echo "Error downloading image from URL.\n";
-            return "";
-        }
-        $image_path = __DIR__ . '/images/temp_image.jpg';
-        file_put_contents($image_path, $image_data);
-        $ascii_art = generate_ascii_art($image_path);
-        return $ascii_art;
-    } else {
-        if ($debugging) {
-            echo "[DEBUG] Failed to generate image from text.\n";
-        }
-        return "";
-    }
+    $ascii_art = generate_image($prompt, $seed);
+    return $ascii_art ?: "";
 }
 
-// 8. Function to generate an image prompt from the assistant's text
+// Function to generate an image prompt from the assistant's text
 function generate_image_prompt_summary($text) {
     $sentences = explode('.', $text);
     $prompt = implode('. ', array_slice($sentences, 0, 2));
     return trim($prompt);
 }
 
-// 9. Function to process the scene and generate image
+// Function to process the scene and generate image
 function process_scene($scene_data, $api_key) {
     global $debugging;
     echo "\n" . colorize($scene_data->narrative) . "\n\n";
@@ -172,7 +133,7 @@ function process_scene($scene_data, $api_key) {
     echo colorize("[cyan](n) Start a new game[/cyan]\n");
 }
 
-// 10. Updated system prompt
+// Updated system prompt
 $system_prompt = "
 You are an interactive text-based adventure game called 'The Quest of the Forgotten Realm'.
 
@@ -183,7 +144,7 @@ In each scene, provide a vivid and immersive description of the surroundings, in
 You must ALWAYS provide exactly 4 options for the player to choose from. Each option should be a single sentence with 1-2 relevant emojis.
 ";
 
-// 11. Define the structured output format without unsupported validations
+// Define the structured output format without unsupported validations
 $response_format = [
     "type" => "json_schema",
     "json_schema" => [
@@ -204,7 +165,7 @@ $response_format = [
                 ],
                 "image" => [
                     "type" => "string",
-                    "description" => "A concise scene description for DALL·E 2 image generation"
+                    "description" => "A concise scene description for Pollinations.ai image generation"
                 ]
             ],
             "required" => ["narrative", "options", "image"],
@@ -214,13 +175,14 @@ $response_format = [
     ]
 ];
 
-// 12. Get the API key
+// Get the API key
 $api_key = get_api_key($api_key_file);
 
-// 13. Initialize the conversation history
+// Initialize the conversation history
 $conversation = [];
+$scene_data = null;  // Initialize scene_data to ensure it's available
 
-// 14. Load the conversation history or start a new game
+// Load the conversation history or start a new game
 if (file_exists($game_history_file)) {
     $history_content = file_get_contents($game_history_file);
     if ($history_content === false) {
@@ -234,6 +196,7 @@ if (file_exists($game_history_file)) {
         for ($i = count($conversation) - 1; $i >= 0; $i--) {
             if ($conversation[$i]['role'] === 'assistant') {
                 $last_assistant_message = $conversation[$i]['content'];
+                $seed = $conversation[$i]['timestamp']; // Set seed to the last timestamp
                 break;
             }
         }
@@ -257,55 +220,48 @@ if (file_exists($game_history_file)) {
         echo "(Type 'exit' or 'quit' to end the game at any time.)\n";
         $conversation = [];
         $conversation[] = ['role' => 'system', 'content' => $system_prompt];
+        $seed = time(); // Set initial seed
     }
 } else {
     echo colorize("[bold][green]Welcome to 'The Quest of the Forgotten Realm'![/green][/bold]\n");
     echo "(Type 'exit' or 'quit' to end the game at any time.)\n";
     $conversation[] = ['role' => 'system', 'content' => $system_prompt];
+    $seed = time(); // Set initial seed
 }
 
-// 15. Ensure the images directory exists
+// Ensure the images directory exists
 $images_dir = __DIR__ . '/images';
 if (!is_dir($images_dir)) {
     mkdir($images_dir, 0755, true);
 }
+
 function removeImageAndDirectory() {
-    // Define the file and directory paths
-    $image_path = __DIR__ . '/images/temp_image.jpg';
+    // Define the directory path
     $directory_path = __DIR__ . '/images';
 
-    // Check if the image file exists and delete it if it does
-    if (file_exists($image_path)) {
-        // Unlink (delete) the image file
-        if (unlink($image_path)) {
-            // echo "File '$image_path' deleted successfully.\n";
-        } else {
-            // echo "Failed to delete the file '$image_path'.\n";
-            return; // Stop if the file could not be deleted
-        }
-    }
-
-    // Check if the directory is empty and exists
+    // Check if the directory exists
     if (is_dir($directory_path)) {
-        // Check if the directory is empty before attempting to remove it
-        if (count(scandir($directory_path)) === 2) { // Only '.' and '..' entries exist
-            if (rmdir($directory_path)) {
-                // echo "Directory '$directory_path' removed successfully.\n";
-            } else {
-                // echo "Failed to remove the directory '$directory_path'.\n";
+        // Scan the directory for files
+        $files = glob($directory_path . '/temp_image_*.jpg');
+        
+        // Delete each file in the directory
+        foreach ($files as $file) {
+            if (is_file($file)) {
+                unlink($file); // Delete the file
             }
-        } else {
-            // echo "Directory '$directory_path' is not empty and cannot be removed.\n";
+        }
+
+        // Remove the directory if it is empty after deletion
+        if (count(scandir($directory_path)) === 2) { // Only '.' and '..' entries exist
+            rmdir($directory_path);
         }
     }
 }
 
-// 16. Main game loop
-$max_iterations = 1000; // Prevent infinite loops
+// Main game loop
+$max_iterations = 1000;
 $current_iteration = 0;
 
-// Initialize scene_data for image generation
-$scene_data = null;
 $should_make_api_call = true;
 
 while (true) {
@@ -325,7 +281,6 @@ while (true) {
 
         debug_log("Sending request to GPT-4o-mini: " . json_encode($data));
 
-        // Make the API call
         $ch = curl_init($chat_url);
         curl_setopt_array($ch, [
             CURLOPT_POST => 1,
@@ -347,10 +302,10 @@ while (true) {
             $scene_data = json_decode($result->choices[0]->message->content);
             if ($scene_data && isset($scene_data->narrative, $scene_data->options, $scene_data->image)) {
                 process_scene($scene_data, $api_key);
-                // Save to conversation history
                 $conversation[] = [
                     'role' => 'assistant',
-                    'content' => $result->choices[0]->message->content
+                    'content' => $result->choices[0]->message->content,
+                    'timestamp' => time() // Add timestamp here
                 ];
                 $write_success = file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
                 if ($write_success === false) {
@@ -375,15 +330,12 @@ while (true) {
         unset($skip_api_call);
     }
 
-    // Handle user input
     echo colorize("\n[cyan]Your choice: [/cyan]");
     $user_input = trim(fgets(STDIN));
     debug_log("User input received: $user_input");
 
-    // Reset API call flag
     $should_make_api_call = false;
 
-    // Handle special commands first
     if (strtolower($user_input) == 'q') {
         echo colorize("\n[bold][yellow]Thank you for playing 'The Quest of the Forgotten Realm'![/yellow][/bold]\n");
         removeImageAndDirectory();
@@ -394,7 +346,6 @@ while (true) {
         echo colorize("\n[bold][yellow]Starting a new game...[/yellow][/bold]\n");
         $conversation = [];
         $conversation[] = ['role' => 'system', 'content' => $system_prompt];
-        // Remove existing game history
         if (file_exists($game_history_file)) {
             unlink($game_history_file);
             debug_log("Game history file deleted for new game.");
@@ -407,10 +358,9 @@ while (true) {
         if ($scene_data) {
             echo colorize("\n[bold][yellow]Generating image for the current scene...[/yellow][/bold]\n");
             $image_prompt = "Low-res 8bit ANSI art: " . $scene_data->image;
-            $ascii_art = process_image_from_text($image_prompt, $api_key);
+            $ascii_art = process_image_from_text($image_prompt, $seed); // Use saved seed
             if (!empty($ascii_art)) {
                 echo "\n" . $ascii_art . "\n\n";
-                // Redisplay the current scene narrative and options
                 process_scene($scene_data, $api_key);
             }
         } else {
@@ -419,22 +369,24 @@ while (true) {
         continue;
     }
 
-    // Handle regular number inputs
     if (!preg_match('/^[1-4]$/', $user_input)) {
         echo colorize("[red]Invalid input. Please enter a number between 1-4, 'g' for image, 'q' to quit, or 'n' for new game.[/red]\n");
-        // Redisplay the current scene
         if ($scene_data) {
             process_scene($scene_data, $api_key);
         }
         continue;
     }
 
-    // Process valid number input
-    $conversation[] = ['role' => 'user', 'content' => $user_input];
+    $timestamp = time();
+    $conversation[] = [
+        'role' => 'user',
+        'content' => $user_input,
+        'timestamp' => $timestamp
+    ];
+    $seed = $timestamp; // Update seed to current action's timestamp
     debug_log("Updated conversation after user input: " . json_encode($conversation));
     $should_make_api_call = true;
 
-    // Save the updated conversation history
     $write_success = file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
     if ($write_success === false) {
         echo "Error: Unable to write to the game history file.\n";
