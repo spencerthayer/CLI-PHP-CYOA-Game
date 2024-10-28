@@ -29,7 +29,8 @@ $char_aspect = 2.5; // Typical terminal character aspect ratio (height/width)
 $scale = 2; // Base scale for sampling
 
 // Character sets for different shading levels
-$alphachars = "`.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#\$Bg0MNWQ%&@";
+// $alphachars = "`.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#\$Bg0MNWQ%&@";
+$alphachars = "`.-':_,^=;><+!%&@";
 $blockchars = "▏▎▍▌▐▖▗▘▝▞▚▙▛▜▟";
 $progessivechars = "▁▂▃▄▅▆▇█";
 $shadeblocks = "░▒▓█";
@@ -37,22 +38,26 @@ $shadeblocks = "░▒▓█";
 // Organize character sets with luminance thresholds
 $charSets = [
     [
-        'threshold' => 0.2, // Darkest
-        'chars' => preg_split('//u', $progessivechars, -1, PREG_SPLIT_NO_EMPTY)
-    ],
-    [
-        'threshold' => 0.4,
+        'threshold' => 0.2, // Strong edges and boundaries
         'chars' => preg_split('//u', $blockchars, -1, PREG_SPLIT_NO_EMPTY)
     ],
     [
-        'threshold' => 0.6,
+        'threshold' => 0.4, // Gradual transitions and smooth gradients
+        'chars' => preg_split('//u', $progessivechars, -1, PREG_SPLIT_NO_EMPTY)
+    ],
+    [
+        'threshold' => 0.6, // Highly detailed areas
         'chars' => preg_split('//u', $shadeblocks, -1, PREG_SPLIT_NO_EMPTY)
     ],
     [
-        'threshold' => 1.0, // Lightest
-        'chars' => preg_split('//u', $alphachars, -1, PREG_SPLIT_NO_EMPTY)
+        'threshold' => 1.0, // Smooth, uniform areas
+        'chars' => preg_split('//u', $shadeblocks, -1, PREG_SPLIT_NO_EMPTY)
     ],
 ];
+
+// Thresholds for variance and edge strength
+$variance_threshold = 0.02; // Adjust as needed
+$edge_threshold = 0.2; // Adjust as needed
 
 // Gamma correction function
 function applyGamma($luminance, $gamma = 1.2) {
@@ -180,49 +185,106 @@ function findClosestAnsiColor($r, $g, $b, $ansi_lab_palette) {
     return $closest;
 }
 
+// Function to analyze the local region around a pixel
+function analyzeLocalRegion($img, $x, $y, $region_size, $width, $height) {
+    $half_size = floor($region_size / 2);
+    $luminances = [];
+    $edge_sum = 0;
+    $count = 0;
+
+    // Collect luminance values and compute edge strength using simple gradient
+    for ($j = -$half_size; $j <= $half_size; $j++) {
+        for ($i = -$half_size; $i <= $half_size; $i++) {
+            $nx = $x + $i;
+            $ny = $y + $j;
+
+            // Boundary check
+            if ($nx < 0 || $nx >= $width || $ny < 0 || $ny >= $height) {
+                continue;
+            }
+
+            $rgb = imagecolorat($img, $nx, $ny);
+            $r = ($rgb >> 16) & 0xFF;
+            $g = ($rgb >> 8) & 0xFF;
+            $b = $rgb & 0xFF;
+
+            // Calculate luminance using Rec. 709
+            $luminance = (0.2126 * $r + 0.7152 * $g + 0.0722 * $b) / 255;
+            $luminances[] = $luminance;
+
+            // Simple edge detection using gradient (Sobel operator can be used for better results)
+            // Here, we approximate the gradient by differences
+            if ($i != 0 || $j != 0) {
+                $edge_sum += abs($luminance - 0.5); // Simple difference from mid luminance
+                $count++;
+            }
+        }
+    }
+
+    // Calculate variance
+    $mean = array_sum($luminances) / count($luminances);
+    $variance = 0.0;
+    foreach ($luminances as $lum) {
+        $variance += pow($lum - $mean, 2);
+    }
+    $variance /= count($luminances);
+
+    // Calculate average edge strength
+    $edge_strength = $count > 0 ? $edge_sum / $count : 0;
+
+    return ['variance' => $variance, 'edge_strength' => $edge_strength];
+}
+
+// Function to select the appropriate character set based on local analysis
+function selectCharacterSet($analysis, $charSets, $variance_threshold, $edge_threshold) {
+    if ($analysis['edge_strength'] > $edge_threshold) {
+        // Strong edges and boundaries
+        return $charSets[0]['chars'];
+    } elseif ($analysis['variance'] > $variance_threshold) {
+        // Highly detailed areas
+        return $charSets[2]['chars'];
+    } elseif ($analysis['variance'] > ($variance_threshold / 2)) {
+        // Gradual transitions and smooth gradients
+        return $charSets[1]['chars'];
+    } else {
+        // Smooth, uniform areas
+        return $charSets[3]['chars'];
+    }
+}
+
 $ascii_art = "";
 
 // Adjust x_scale to account for character aspect ratio
 $x_scale = $scale;
 $y_scale = $scale * $char_aspect;
 
+// Define the size of the local region for analysis (e.g., 3x3)
+$region_size = 3;
+
 for ($y = 0; $y <= $height - $y_scale; $y += $y_scale) {
     for ($x = 0; $x <= $width - $x_scale; $x += $x_scale) {
+        // Analyze the local region around the current pixel
+        $analysis = analyzeLocalRegion($img, $x, $y, $region_size, $width, $height);
+
+        // Select the appropriate character set based on analysis
+        $currentChars = selectCharacterSet($analysis, $charSets, $variance_threshold, $edge_threshold);
+        $setCount = count($currentChars);
+
+        // Calculate luminance and apply gamma correction for the current pixel
         $rgb = imagecolorat($img, $x, $y);
         $r = ($rgb >> 16) & 0xFF;
         $g = ($rgb >> 8) & 0xFF;
         $b = $rgb & 0xFF;
 
-        // Calculate luminance and apply gamma correction
-        $luminance = ($r + $g + $b) / (255 * 3);
+        // Calculate luminance using Rec. 709 and apply gamma correction
+        $luminance = (0.2126 * $r + 0.7152 * $g + 0.0722 * $b) / 255;
         $luminance = applyGamma($luminance, 1.2); // Adjust the gamma as needed
 
-        // Find the appropriate character set based on luminance
-        foreach ($charSets as $index => $set) {
-            if ($luminance <= $set['threshold']) {
-                $currentChars = $set['chars'];
-                $setCount = count($currentChars);
-                
-                // Determine previous threshold
-                $previousThreshold = 0;
-                if ($index > 0) {
-                    $previousThreshold = $charSets[$index - 1]['threshold'];
-                }
-                
-                // Normalize luminance within the current set's range
-                $normalizedLum = ($luminance - $previousThreshold) / ($set['threshold'] - $previousThreshold);
-                $normalizedLum = max(0, min(1, $normalizedLum)); // Clamp between 0 and 1
-                
-                // Calculate character index within the current set
-                $charIndex = (int)(($setCount - 1) * $normalizedLum);
-                
-                // Optional: Add some randomness for artistic effect
-                // $charIndex = min($setCount - 1, max(0, $charIndex + rand(-1, 1)));
-                
-                $selectedChar = $currentChars[$charIndex];
-                break;
-            }
-        }
+        // Map luminance to character index within the selected set
+        $charIndex = (int)(($setCount - 1) * $luminance);
+        $charIndex = max(0, min($setCount - 1, $charIndex)); // Clamp index
+
+        $selectedChar = $currentChars[$charIndex];
 
         // Find the closest ANSI color
         $ansiColor = findClosestAnsiColor($r, $g, $b, $ansi_lab_palette);
