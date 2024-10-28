@@ -39,15 +39,15 @@ $shadeblocks = "░▒▓█";
 $charSets = [
     [
         'threshold' => 0.2, // Strong edges and boundaries
-        'chars' => preg_split('//u', $blockchars, -1, PREG_SPLIT_NO_EMPTY)
+        'chars' => preg_split('//u', $progessivechars, -1, PREG_SPLIT_NO_EMPTY)
     ],
     [
-        'threshold' => 0.4, // Gradual transitions and smooth gradients
+        'threshold' => 0.3, // Gradual transitions and smooth gradients
         'chars' => preg_split('//u', $progessivechars, -1, PREG_SPLIT_NO_EMPTY)
     ],
     [
         'threshold' => 0.6, // Highly detailed areas
-        'chars' => preg_split('//u', $shadeblocks, -1, PREG_SPLIT_NO_EMPTY)
+        'chars' => preg_split('//u', $blockchars, -1, PREG_SPLIT_NO_EMPTY)
     ],
     [
         'threshold' => 1.0, // Smooth, uniform areas
