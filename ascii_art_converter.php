@@ -27,13 +27,15 @@ $char_aspect = 2.5; // Typical terminal character aspect ratio (height/width)
 $scale = 2; // Base scale for sampling
 
 // Comprehensive character set for better shading
-$alphachars = " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#\$Bg0MNWQ%&@";
-$blockchars = " ░▒▓█";
-$morechars = " ▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐▔▕▖▗▘▙▚▛▜▝▞▟░▒▓";
-$chars = $blockchars;
+$shadeblocks = "░▒▓█";
+$chars = " ".$shadeblocks;
 $charsArray = preg_split('//u', $chars, -1, PREG_SPLIT_NO_EMPTY);
 
 $cCount = count($charsArray);
+
+// ANSI grayscale color codes from 232 to 255
+$ansi_grayscale = range(232, 255);
+$gCount = count($ansi_grayscale);
 
 $ascii_art = "";
 
@@ -52,9 +54,12 @@ for ($y = 0; $y <= $height - $y_scale; $y += $y_scale) {
         $luminance = ($r + $g + $b) / (255 * 3);
         // Map luminance to character index
         $charIndex = (int)(($cCount - 1) * $luminance);
-        $ascii_art .= $charsArray[$charIndex];
+        $colorIndex = (int)(($gCount - 1) * $luminance);
+
+        // Add ANSI color escape code
+        $ascii_art .= "\e[38;5;" . $ansi_grayscale[$colorIndex] . "m" . $charsArray[$charIndex];
     }
-    $ascii_art .= PHP_EOL;
+    $ascii_art .= "\e[0m" . PHP_EOL;  // Reset to default at the end of each line
 }
 
 echo $ascii_art;

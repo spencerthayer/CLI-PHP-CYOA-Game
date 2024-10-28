@@ -138,7 +138,7 @@ function process_image_from_text($text, $api_key) {
         $image_path = __DIR__ . '/images/temp_image.jpg';
         file_put_contents($image_path, $image_data);
         $ascii_art = generate_ascii_art($image_path);
-        unlink($image_path);
+        // unlink($image_path);
         return $ascii_art;
     } else {
         if ($debugging) {
@@ -357,6 +357,8 @@ while (true) {
     // Handle special commands first
     if (strtolower($user_input) == 'q') {
         echo colorize("\n[bold][yellow]Thank you for playing 'The Quest of the Forgotten Realm'![/yellow][/bold]\n");
+        $image_path = __DIR__ . '/images/temp_image.jpg';
+        unlink($image_path);
         break;
     }
 
@@ -376,7 +378,7 @@ while (true) {
     if (strtolower($user_input) == 'g') {
         if ($scene_data) {
             echo colorize("\n[bold][yellow]Generating image for the current scene...[/yellow][/bold]\n");
-            $image_prompt = "Low-res greyscale 8bit: " . $scene_data->image;
+            $image_prompt = "Low-res greyscale ANSI style art: " . $scene_data->image;
             $ascii_art = process_image_from_text($image_prompt, $api_key);
             if (!empty($ascii_art)) {
                 echo "\n" . $ascii_art . "\n\n";
