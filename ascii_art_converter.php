@@ -33,9 +33,61 @@ $charsArray = preg_split('//u', $chars, -1, PREG_SPLIT_NO_EMPTY);
 
 $cCount = count($charsArray);
 
-// ANSI grayscale color codes from 232 to 255
-$ansi_grayscale = range(232, 255);
-$gCount = count($ansi_grayscale);
+// Function to get the RGB values of the 256 ANSI color palette
+function getAnsiColorPalette() {
+    $colors = [];
+    
+    // Standard colors (0–15)
+    $base_colors = [
+        [0, 0, 0], [128, 0, 0], [0, 128, 0], [128, 128, 0], [0, 0, 128], [128, 0, 128], [0, 128, 128], [192, 192, 192],
+        [128, 128, 128], [255, 0, 0], [0, 255, 0], [255, 255, 0], [0, 0, 255], [255, 0, 255], [0, 255, 255], [255, 255, 255]
+    ];
+
+    // Colors 16-231: 6x6x6 color cube
+    for ($r = 0; $r < 6; $r++) {
+        for ($g = 0; $g < 6; $g++) {
+            for ($b = 0; $b < 6; $b++) {
+                $colors[] = [
+                    $r == 0 ? 0 : 55 + 40 * $r,
+                    $g == 0 ? 0 : 55 + 40 * $g,
+                    $b == 0 ? 0 : 55 + 40 * $b
+                ];
+            }
+        }
+    }
+
+    // Colors 232-255: grayscale ramp
+    for ($i = 0; $i < 24; $i++) {
+        $gray = 8 + $i * 10;
+        $colors[] = [$gray, $gray, $gray];
+    }
+
+    return array_merge($base_colors, $colors);
+}
+
+// Precompute ANSI palette RGB values
+$ansi_palette = getAnsiColorPalette();
+
+// Function to calculate the Euclidean distance between two RGB colors
+function colorDistance($rgb1, $rgb2) {
+    return sqrt(pow($rgb1[0] - $rgb2[0], 2) + pow($rgb1[1] - $rgb2[1], 2) + pow($rgb1[2] - $rgb2[2], 2));
+}
+
+// Function to find the closest ANSI color for a given RGB value
+function findClosestAnsiColor($r, $g, $b, $ansi_palette) {
+    $closest = 0;
+    $min_distance = PHP_FLOAT_MAX;
+
+    foreach ($ansi_palette as $i => $color) {
+        $distance = colorDistance([$r, $g, $b], $color);
+        if ($distance < $min_distance) {
+            $min_distance = $distance;
+            $closest = $i;
+        }
+    }
+
+    return $closest;
+}
 
 $ascii_art = "";
 
@@ -54,10 +106,12 @@ for ($y = 0; $y <= $height - $y_scale; $y += $y_scale) {
         $luminance = ($r + $g + $b) / (255 * 3);
         // Map luminance to character index
         $charIndex = (int)(($cCount - 1) * $luminance);
-        $colorIndex = (int)(($gCount - 1) * $luminance);
+
+        // Find the closest ANSI color
+        $ansiColor = findClosestAnsiColor($r, $g, $b, $ansi_palette);
 
         // Add ANSI color escape code
-        $ascii_art .= "\e[38;5;" . $ansi_grayscale[$colorIndex] . "m" . $charsArray[$charIndex];
+        $ascii_art .= "\e[38;5;" . $ansiColor . "m" . $charsArray[$charIndex];
     }
     $ascii_art .= "\e[0m" . PHP_EOL;  // Reset to default at the end of each line
 }

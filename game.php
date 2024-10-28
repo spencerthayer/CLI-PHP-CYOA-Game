@@ -138,7 +138,6 @@ function process_image_from_text($text, $api_key) {
         $image_path = __DIR__ . '/images/temp_image.jpg';
         file_put_contents($image_path, $image_data);
         $ascii_art = generate_ascii_art($image_path);
-        // unlink($image_path);
         return $ascii_art;
     } else {
         if ($debugging) {
@@ -270,6 +269,36 @@ $images_dir = __DIR__ . '/images';
 if (!is_dir($images_dir)) {
     mkdir($images_dir, 0755, true);
 }
+function removeImageAndDirectory() {
+    // Define the file and directory paths
+    $image_path = __DIR__ . '/images/temp_image.jpg';
+    $directory_path = __DIR__ . '/images';
+
+    // Check if the image file exists and delete it if it does
+    if (file_exists($image_path)) {
+        // Unlink (delete) the image file
+        if (unlink($image_path)) {
+            // echo "File '$image_path' deleted successfully.\n";
+        } else {
+            // echo "Failed to delete the file '$image_path'.\n";
+            return; // Stop if the file could not be deleted
+        }
+    }
+
+    // Check if the directory is empty and exists
+    if (is_dir($directory_path)) {
+        // Check if the directory is empty before attempting to remove it
+        if (count(scandir($directory_path)) === 2) { // Only '.' and '..' entries exist
+            if (rmdir($directory_path)) {
+                // echo "Directory '$directory_path' removed successfully.\n";
+            } else {
+                // echo "Failed to remove the directory '$directory_path'.\n";
+            }
+        } else {
+            // echo "Directory '$directory_path' is not empty and cannot be removed.\n";
+        }
+    }
+}
 
 // 16. Main game loop
 $max_iterations = 1000; // Prevent infinite loops
@@ -357,8 +386,7 @@ while (true) {
     // Handle special commands first
     if (strtolower($user_input) == 'q') {
         echo colorize("\n[bold][yellow]Thank you for playing 'The Quest of the Forgotten Realm'![/yellow][/bold]\n");
-        $image_path = __DIR__ . '/images/temp_image.jpg';
-        unlink($image_path);
+        removeImageAndDirectory();
         break;
     }
 
@@ -378,7 +406,7 @@ while (true) {
     if (strtolower($user_input) == 'g') {
         if ($scene_data) {
             echo colorize("\n[bold][yellow]Generating image for the current scene...[/yellow][/bold]\n");
-            $image_prompt = "Low-res greyscale ANSI style art: " . $scene_data->image;
+            $image_prompt = "Low-res 8bit ANSI art: " . $scene_data->image;
             $ascii_art = process_image_from_text($image_prompt, $api_key);
             if (!empty($ascii_art)) {
                 echo "\n" . $ascii_art . "\n\n";
