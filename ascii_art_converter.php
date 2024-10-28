@@ -34,7 +34,7 @@ $config = [
         'edge' => 0.4,       // Weight for edge strength
         'variance' => 0.4,   // Weight for local variance
         'gradient' => 0.8,   // Weight for average gradient
-        'intensity' => 0.2   //Weight for mean intensity
+        'intensity' => 0.2   // Weight for mean intensity
     ],
     'random_factor' => 0,    // Factor to introduce randomness in character selection
     'region_size' => 10       // Size of the local region for analysis (5x5)
@@ -171,100 +171,81 @@ class CharacterSelector {
     private $alphachars;
     private $blockchars;
     private $progressivechars;
-    private $shadechars; // Renamed from shadeblocks to shadechars for consistency
+    private $shadechars;
     private $config;
-    private $charComplexity;
+    
+    // Enhanced feature weights with context
+    private $feature_weights = [
+        'edge' => [
+            'weight' => 0.35,
+            'threshold' => 0.2,
+            'preferred_chars' => 'block'
+        ],
+        'texture' => [
+            'weight' => 0.25,
+            'threshold' => 0.15,
+            'preferred_chars' => 'shade'
+        ],
+        'gradient' => [
+            'weight' => 0.25,
+            'threshold' => 0.1,
+            'preferred_chars' => 'shade'
+        ],
+        'smoothness' => [
+            'weight' => 0.15,
+            'threshold' => 0.3,
+            'preferred_chars' => 'progressive'
+        ]
+    ];
 
     public function __construct($config) {
         $this->config = $config;
-
-        // Initialize character sets
-        $this->alphachars = preg_split('//u', "`.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#\$Bg0MNWQ%&@", -1, PREG_SPLIT_NO_EMPTY);
-        $this->blockchars = preg_split('//u', "▏▎▍▌▐▖▗▘▝▞▚▙▛▜▟", -1, PREG_SPLIT_NO_EMPTY);
-        $this->progressivechars = preg_split('//u', "▁▂▃▄▅▆▇█", -1, PREG_SPLIT_NO_EMPTY);
-        $this->shadechars = preg_split('//u', "░▒▓█", -1, PREG_SPLIT_NO_EMPTY); // Corrected property name
-
-        // Preprocess character complexities
-        $this->preprocessCharacterComplexities();
+        
+        // Initialize character sets with visual weight metadata
+        $this->initializeCharacterSets();
     }
 
-    // Preprocess character complexities
-    private function preprocessCharacterComplexities() {
-        $this->charComplexity = [];
-
-        foreach (['block', 'progressive', 'alpha', 'shade'] as $type) {
-            $chars = $this->{$type . 'chars'};
-            foreach ($chars as $char) {
-                $this->charComplexity[$type][$char] = $this->calculateCharComplexity($char);
-            }
-        }
-    }
-
-    // Calculate character complexity
-    private function calculateCharComplexity($char) {
-        $complexity = 0;
-        if (preg_match('/[#@%&]/', $char)) $complexity += 1.0;
-        if (preg_match('/[A-Z]/', $char)) $complexity += 0.8;
-        if (preg_match('/[a-z]/', $char)) $complexity += 0.5;
-        if (preg_match('/[0-9]/', $char)) $complexity += 0.3;
-        if (preg_match('/[^\w\s]/', $char)) $complexity += 0.7;
-        // Add more rules as needed
-        return $complexity;
-    }
-
-    // Calculate local entropy
-    private function calculateLocalEntropy($samples) {
-        // Discretize values into bins (convert floats to integers)
-        $bins = 10; // Number of bins for histogram
-        $discretized = array_map(function($value) use ($bins) {
-            return (int)floor($value * ($bins - 1));
-        }, $samples);
-
-        // Create histogram
-        $histogram = array_count_values($discretized);
-        $total_samples = count($samples);
-
-        // Calculate entropy using the histogram
-        $entropy = 0.0;
-        foreach ($histogram as $count) {
-            $probability = $count / $total_samples;
-            if ($probability > 0) {
-                $entropy -= $probability * log($probability, 2);
-            }
-        }
-
-        // Normalize entropy to [0,1] range
-        $max_entropy = log($bins, 2); // Maximum possible entropy for given bins
-        return $max_entropy > 0 ? ($entropy / $max_entropy) : 0;
-    }
-
-    // Calculate contrast
-    private function calculateContrast($mean, $variance) {
-        return sqrt($variance) / ($mean + 0.01); // Avoid division by zero
-    }
-
-    // Calculate gradient magnitude using Sobel operator
-    private function calculateGradient($img, $x, $y, $width, $height) {
-        $sobelX = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]];
-        $sobelY = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]];
-
-        $gradX = 0;
-        $gradY = 0;
-
-        for ($i = -1; $i <= 1; $i++) {
-            for ($j = -1; $j <= 1; $j++) {
-                $px = min(max($x + $i, 0), $width - 1);
-                $py = min(max($y + $j, 0), $height - 1);
-
-                $rgb = imagecolorat($img, $px, $py);
-                $luminance = $this->calculateLuminance($rgb);
-
-                $gradX += $luminance * $sobelX[$i + 1][$j + 1];
-                $gradY += $luminance * $sobelY[$i + 1][$j + 1];
-            }
-        }
-
-        return sqrt($gradX * $gradX + $gradY * $gradY);
+    private function initializeCharacterSets() {
+        // Block characters for strong edges and geometric shapes
+        $this->blockchars = [
+            ['char' => '▌', 'weight' => 0.5],
+            ['char' => '▐', 'weight' => 0.5],
+            ['char' => '▀', 'weight' => 0.5],
+            ['char' => '▄', 'weight' => 0.5],
+            ['char' => '█', 'weight' => 1.0],
+            ['char' => '▚', 'weight' => 0.5],
+            ['char' => '▞', 'weight' => 0.5],
+            ['char' => '▟', 'weight' => 0.75],
+            ['char' => '▙', 'weight' => 0.75]
+        ];
+        
+        // Progressive characters for smooth gradients
+        $this->progressivechars = [
+            ['char' => '▁', 'weight' => 0.125],
+            ['char' => '▂', 'weight' => 0.25],
+            ['char' => '▃', 'weight' => 0.375],
+            ['char' => '▄', 'weight' => 0.5],
+            ['char' => '▅', 'weight' => 0.625],
+            ['char' => '▆', 'weight' => 0.75],
+            ['char' => '▇', 'weight' => 0.875],
+            ['char' => '█', 'weight' => 1.0]
+        ];
+        
+        // Alpha characters ordered by visual density
+        $alphaOrder = "`.'\",:;!i|Il()[]{}?-_+~<>iv^*═║╔╗╚╝╠╣╦╩╬";
+        $this->alphachars = array_map(function($char) use ($alphaOrder) {
+            $weight = (strpos($alphaOrder, $char) + 1) / strlen($alphaOrder);
+            return ['char' => $char, 'weight' => $weight];
+        }, str_split($alphaOrder));
+        
+        // Shade characters for smooth areas
+        $this->shadechars = [
+            ['char' => ' ', 'weight' => 0.0],
+            ['char' => '░', 'weight' => 0.25],
+            ['char' => '▒', 'weight' => 0.5],
+            ['char' => '▓', 'weight' => 0.75],
+            ['char' => '█', 'weight' => 1.0]
+        ];
     }
 
     // Calculate luminance using Rec. 709
@@ -277,6 +258,19 @@ class CharacterSelector {
 
         // Ensure luminance is in [0,1] range
         return max(0, min(1, $luminance));
+    }
+
+    // Calculate variance
+    private function calculateVariance($samples, $mean) {
+        if (empty($samples)) {
+            return 0;
+        }
+
+        $squared_diff_sum = array_reduce($samples, function($carry, $item) use ($mean) {
+            return $carry + pow($item - $mean, 2);
+        }, 0);
+
+        return $squared_diff_sum / count($samples);
     }
 
     // Analyze local region characteristics
@@ -323,17 +317,54 @@ class CharacterSelector {
         ];
     }
 
-    // Improved variance calculation with null checks
-    private function calculateVariance($samples, $mean) {
-        if (empty($samples)) {
-            return 0;
+    // Calculate gradient magnitude using Sobel operator
+    private function calculateGradient($img, $x, $y, $width, $height) {
+        $sobelX = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]];
+        $sobelY = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]];
+
+        $gradX = 0;
+        $gradY = 0;
+
+        for ($i = -1; $i <= 1; $i++) {
+            for ($j = -1; $j <= 1; $j++) {
+                $px = min(max($x + $i, 0), $width - 1);
+                $py = min(max($y + $j, 0), $height - 1);
+
+                $rgb = imagecolorat($img, $px, $py);
+                $luminance = $this->calculateLuminance($rgb);
+
+                $gradX += $luminance * $sobelX[$i + 1][$j + 1];
+                $gradY += $luminance * $sobelY[$i + 1][$j + 1];
+            }
         }
 
-        $squared_diff_sum = array_reduce($samples, function($carry, $item) use ($mean) {
-            return $carry + pow($item - $mean, 2);
-        }, 0);
+        return sqrt($gradX * $gradX + $gradY * $gradY);
+    }
 
-        return $squared_diff_sum / count($samples);
+    // Calculate local entropy
+    private function calculateLocalEntropy($samples) {
+        // Discretize values into bins (convert floats to integers)
+        $bins = 10; // Number of bins for histogram
+        $discretized = array_map(function($value) use ($bins) {
+            return (int)floor($value * ($bins - 1));
+        }, $samples);
+
+        // Create histogram
+        $histogram = array_count_values($discretized);
+        $total_samples = count($samples);
+
+        // Calculate entropy using the histogram
+        $entropy = 0.0;
+        foreach ($histogram as $count) {
+            $probability = $count / $total_samples;
+            if ($probability > 0) {
+                $entropy -= $probability * log($probability, 2);
+            }
+        }
+
+        // Normalize entropy to [0,1] range
+        $max_entropy = log($bins, 2); // Maximum possible entropy for given bins
+        return $max_entropy > 0 ? ($entropy / $max_entropy) : 0;
     }
 
     // Calculate character weights based on region analysis
@@ -394,7 +425,7 @@ class CharacterSelector {
         $chars = match($selected_set) {
             'block' => $this->blockchars,
             'progressive' => $this->progressivechars,
-            // 'alpha' => $this->alphachars,
+            'alpha' => $this->alphachars,
             default => $this->shadechars
         };
 
@@ -403,10 +434,18 @@ class CharacterSelector {
         $random_adjustment = (mt_rand() / mt_getrandmax() - 0.5) * $random_factor;
         $adjusted_luminance = max(0, min(1, $luminance + $random_adjustment));
 
-        $index = (int)($adjusted_luminance * (count($chars) - 1));
-        $index = max(0, min(count($chars) - 1, $index));
+        // Find the character with the closest weight to the adjusted luminance
+        $best_char = $chars[0]['char'];
+        $min_diff = abs($chars[0]['weight'] - $adjusted_luminance);
+        foreach ($chars as $char_data) {
+            $diff = abs($char_data['weight'] - $adjusted_luminance);
+            if ($diff < $min_diff) {
+                $min_diff = $diff;
+                $best_char = $char_data['char'];
+            }
+        }
 
-        return $chars[$index];
+        return $best_char;
     }
 }
 
@@ -418,18 +457,18 @@ $ascii_art = "";
 
 // Define the size of the local region for analysis (e.g., 5x5)
 $region_size = $config['region_size'];
-$region_size = floor($region_size / 2);
+$half_region = floor($region_size / 2);
 
 // Calculate step sizes based on scale and region size
 $step_x = $scale;
-$step_y = ( $scale * $char_aspect );
+$step_y = floor($scale * $char_aspect);
 
 // Ensure step sizes are at least 1 to prevent infinite loops
 $step_x = max(1, $step_x);
 $step_y = max(1, $step_y);
 
-for ($y = 0; $y <= $height - $region_size; $y += $step_y) {
-    for ($x = 0; $x <= $width - $region_size; $x += $step_x) {
+for ($y = 0; $y <= $height - $half_region; $y += $step_y) {
+    for ($x = 0; $x <= $width - $half_region; $x += $step_x) {
         // Get RGB values
         $rgb = imagecolorat($img, $x, $y);
         $r = ($rgb >> 16) & 0xFF;
