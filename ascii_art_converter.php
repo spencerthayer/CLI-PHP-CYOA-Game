@@ -29,8 +29,10 @@ $char_aspect = 2.5; // Typical terminal character aspect ratio (height/width)
 $scale = 2; // Base scale for sampling
 
 // Character set for shading
+$alphachars = " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#\$Bg0MNWQ%&@";
+$blockchars = " ▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐▔▕▖▗▘▙▚▛▜▝▞▟";
 $shadeblocks = "░▒▓█";
-$chars = " " . $shadeblocks; // Include space for lighter areas
+$chars = " " . $shadeblocks;
 $charsArray = preg_split('//u', $chars, -1, PREG_SPLIT_NO_EMPTY);
 
 $cCount = count($charsArray);

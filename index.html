@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Quest of the Forgotten Realm</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.js"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-green-400 mb-2">The Quest of the Forgotten Realm</h1>
+            <p class="text-gray-400">A Text-Based Adventure Game</p>
+        </header>
+
+        <!-- Game Content -->
+        <div class="bg-gray-800 rounded-lg p-6 shadow-lg mb-6">
+            <!-- Story Text -->
+            <div id="narrative" class="mb-6 text-lg leading-relaxed min-h-[200px]">
+                Welcome to The Quest of the Forgotten Realm...
+            </div>
+
+            <!-- ASCII Art Container -->
+            <div id="ascii-art" class="mb-6 p-4 bg-black rounded font-mono text-xs whitespace-pre hidden"></div>
+
+            <!-- Options -->
+            <div id="options" class="space-y-3">
+                <!-- Options will be dynamically inserted here -->
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex justify-center space-x-4">
+            <button onclick="generateImage()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg">
+                Generate Image (G)
+            </button>
+            <button onclick="newGame()" class="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-2 rounded-lg">
+                New Game (N)
+            </button>
+            <button onclick="quitGame()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg">
+                Quit (Q)
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentScene = null;
+        let gameHistory = [];
+
+        async function makeGameRequest(userChoice = null) {
+            try {
+                const response = await fetch('game_handler.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        choice: userChoice,
+                        history: gameHistory
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                const data = await response.json();
+                currentScene = data;
+                
+                // Update the UI
+                updateGameUI(data);
+                
+                // Update game history
+                if (userChoice !== null) {
+                    gameHistory.push({
+                        role: 'user',
+                        content: userChoice.toString()
+                    });
+                }
+                gameHistory.push({
+                    role: 'assistant',
+                    content: JSON.stringify(data)
+                });
+
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('narrative').innerHTML = 'An error occurred. Please try again.';
+            }
+        }
+
+        function updateGameUI(sceneData) {
+            // Update narrative
+            const narrativeEl = document.getElementById('narrative');
+            narrativeEl.innerHTML = sceneData.narrative.replace(/\n/g, '<br>');
+
+            // Update options
+            const optionsEl = document.getElementById('options');
+            optionsEl.innerHTML = sceneData.options.map((option, index) => `
+                <button 
+                    onclick="selectOption(${index + 1})" 
+                    class="w-full text-left p-4 bg-gray-700 hover:bg-gray-600 rounded transition-colors">
+                    ${index + 1}. ${option}
+                </button>
+            `).join('');
+        }
+
+        async function generateImage() {
+            if (!currentScene) return;
+            
+            try {
+                const response = await fetch('game_handler.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'generate_image',
+                        scene: currentScene
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                const data = await response.json();
+                if (data.ascii_art) {
+                    const asciiArtEl = document.getElementById('ascii-art');
+                    asciiArtEl.textContent = data.ascii_art;
+                    asciiArtEl.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error generating image:', error);
+            }
+        }
+
+        function selectOption(choice) {
+            makeGameRequest(choice);
+        }
+
+        function newGame() {
+            gameHistory = [];
+            makeGameRequest();
+        }
+
+        function quitGame() {
+            document.getElementById('narrative').innerHTML = 'Thanks for playing! Refresh the page to start a new game.';
+            document.getElementById('options').innerHTML = '';
+        }
+
+        // Handle keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key >= '1' && e.key <= '4') {
+                selectOption(parseInt(e.key));
+            } else if (e.key.toLowerCase() === 'g') {
+                generateImage();
+            } else if (e.key.toLowerCase() === 'n') {
+                newGame();
+            } else if (e.key.toLowerCase() === 'q') {
+                quitGame();
+            }
+        });
+
+        // Start the game when the page loads
+        window.onload = () => makeGameRequest();
+    </script>
+</body>
+</html>
