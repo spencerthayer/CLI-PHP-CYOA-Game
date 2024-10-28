@@ -376,7 +376,7 @@ while (true) {
     }
 
     // Handle user input
-    echo colorize("\n[cyan]Your choice (1-4, 'g' for image, 'q' to quit, 'n' for new game): [/cyan]");
+    echo colorize("\n[cyan]Your choice: [/cyan]");
     $user_input = trim(fgets(STDIN));
     debug_log("User input received: $user_input");
 
