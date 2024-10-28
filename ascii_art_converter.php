@@ -28,14 +28,31 @@ list($width, $height) = getimagesize($file);
 $char_aspect = 2.5; // Typical terminal character aspect ratio (height/width)
 $scale = 2; // Base scale for sampling
 
-// Character set for shading
-$alphachars = " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#\$Bg0MNWQ%&@";
-$blockchars = " ▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐▔▕▖▗▘▙▚▛▜▝▞▟";
+// Character sets for different shading levels
+$alphachars = "`.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#\$Bg0MNWQ%&@";
+$blockchars = "▏▎▍▌▐▖▗▘▝▞▚▙▛▜▟";
+$progessivechars = "▁▂▃▄▅▆▇█";
 $shadeblocks = "░▒▓█";
-$chars = " " . $shadeblocks;
-$charsArray = preg_split('//u', $chars, -1, PREG_SPLIT_NO_EMPTY);
 
-$cCount = count($charsArray);
+// Organize character sets with luminance thresholds
+$charSets = [
+    [
+        'threshold' => 0.2, // Darkest
+        'chars' => preg_split('//u', $progessivechars, -1, PREG_SPLIT_NO_EMPTY)
+    ],
+    [
+        'threshold' => 0.4,
+        'chars' => preg_split('//u', $blockchars, -1, PREG_SPLIT_NO_EMPTY)
+    ],
+    [
+        'threshold' => 0.6,
+        'chars' => preg_split('//u', $shadeblocks, -1, PREG_SPLIT_NO_EMPTY)
+    ],
+    [
+        'threshold' => 1.0, // Lightest
+        'chars' => preg_split('//u', $alphachars, -1, PREG_SPLIT_NO_EMPTY)
+    ],
+];
 
 // Gamma correction function
 function applyGamma($luminance, $gamma = 1.2) {
@@ -111,8 +128,10 @@ function getAnsiColorPalette() {
 
     // Standard colors (0–15)
     $base_colors = [
-        [0, 0, 0], [128, 0, 0], [0, 128, 0], [128, 128, 0], [0, 0, 128], [128, 0, 128], [0, 128, 128], [192, 192, 192],
-        [128, 128, 128], [255, 0, 0], [0, 255, 0], [255, 255, 0], [0, 0, 255], [255, 0, 255], [0, 255, 255], [255, 255, 255]
+        [0, 0, 0], [128, 0, 0], [0, 128, 0], [128, 128, 0],
+        [0, 0, 128], [128, 0, 128], [0, 128, 128], [192, 192, 192],
+        [128, 128, 128], [255, 0, 0], [0, 255, 0], [255, 255, 0],
+        [0, 0, 255], [255, 0, 255], [0, 255, 255], [255, 255, 255]
     ];
 
     // Colors 16-231: 6x6x6 color cube
@@ -178,14 +197,38 @@ for ($y = 0; $y <= $height - $y_scale; $y += $y_scale) {
         $luminance = ($r + $g + $b) / (255 * 3);
         $luminance = applyGamma($luminance, 1.2); // Adjust the gamma as needed
 
-        // Map luminance to character index
-        $charIndex = (int)(($cCount - 1) * $luminance);
+        // Find the appropriate character set based on luminance
+        foreach ($charSets as $index => $set) {
+            if ($luminance <= $set['threshold']) {
+                $currentChars = $set['chars'];
+                $setCount = count($currentChars);
+                
+                // Determine previous threshold
+                $previousThreshold = 0;
+                if ($index > 0) {
+                    $previousThreshold = $charSets[$index - 1]['threshold'];
+                }
+                
+                // Normalize luminance within the current set's range
+                $normalizedLum = ($luminance - $previousThreshold) / ($set['threshold'] - $previousThreshold);
+                $normalizedLum = max(0, min(1, $normalizedLum)); // Clamp between 0 and 1
+                
+                // Calculate character index within the current set
+                $charIndex = (int)(($setCount - 1) * $normalizedLum);
+                
+                // Optional: Add some randomness for artistic effect
+                // $charIndex = min($setCount - 1, max(0, $charIndex + rand(-1, 1)));
+                
+                $selectedChar = $currentChars[$charIndex];
+                break;
+            }
+        }
 
         // Find the closest ANSI color
         $ansiColor = findClosestAnsiColor($r, $g, $b, $ansi_lab_palette);
 
-        // Add ANSI color escape code
-        $ascii_art .= "\e[38;5;" . $ansiColor . "m" . $charsArray[$charIndex];
+        // Add ANSI color escape code and the selected character
+        $ascii_art .= "\e[38;5;" . $ansiColor . "m" . $selectedChar;
     }
     $ascii_art .= "\e[0m" . PHP_EOL;  // Reset to default at the end of each line
 }
