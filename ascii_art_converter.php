@@ -177,24 +177,24 @@ class CharacterSelector {
     // Enhanced feature weights with context
     private $feature_weights = [
         'edge' => [
-            'weight' => 0.35,
-            'threshold' => 0.2,
+            'weight' => 0.1,      // Reduced from 0.35 to de-emphasize edges
+            'threshold' => 0.3,
             'preferred_chars' => 'block'
         ],
         'texture' => [
-            'weight' => 0.25,
-            'threshold' => 0.15,
-            'preferred_chars' => 'shade'
+            'weight' => 0.1,      // Reduced from 0.25 to de-emphasize texture
+            'threshold' => 0.3,
+            'preferred_chars' => 'alpha'
         ],
         'gradient' => [
-            'weight' => 0.25,
-            'threshold' => 0.1,
-            'preferred_chars' => 'shade'
+            'weight' => 0.2,      // Moderate weight for gradual transitions
+            'threshold' => 0.2,
+            'preferred_chars' => 'progressive'
         ],
         'smoothness' => [
-            'weight' => 0.15,
-            'threshold' => 0.3,
-            'preferred_chars' => 'progressive'
+            'weight' => 0.6,      // Increased significantly to favor shading
+            'threshold' => 0.1,
+            'preferred_chars' => 'shade'
         ]
     ];
 
@@ -232,7 +232,7 @@ class CharacterSelector {
         ];
         
         // Alpha characters ordered by visual density
-        $alphaOrder = "`.'\",:;!i|Il()[]{}?-_+~<>iv^*═║╔╗╚╝╠╣╦╩╬";
+        $alphaOrder = "`.'\",:;!i|Il()[]{}?-_+~<>iv^*";
         $this->alphachars = array_map(function($char) use ($alphaOrder) {
             $weight = (strpos($alphaOrder, $char) + 1) / strlen($alphaOrder);
             return ['char' => $char, 'weight' => $weight];
@@ -375,23 +375,23 @@ class CharacterSelector {
             'alpha' => 0,
             'shade' => 0
         ];
-
-        // Edge detection weight
-        $edge_strength = $analysis['edge'];
+    
+        // Reduce edge influence
+        $edge_strength = $analysis['edge'] * 0.5; // Dampen edge detection
         $weights['block'] += $edge_strength * $this->config['weights']['edge'];
-
-        // Variance-based weighting
-        $variance = $analysis['variance'];
+    
+        // Reduce variance influence
+        $variance = $analysis['variance'] * 0.5; // Dampen texture detection
         $weights['alpha'] += $variance * $this->config['weights']['variance'];
-
-        // Gradient-based weighting
+    
+        // Moderate gradient influence
         $gradient = $analysis['gradient'];
         $weights['progressive'] += $gradient * $this->config['weights']['gradient'];
-
-        // Intensity-based weighting (favoring mid-intensity for shadechars)
+    
+        // Boost shading influence
         $intensity = $analysis['intensity'];
-        $weights['shade'] += (1 - abs($intensity - 0.5) * 2) * $this->config['weights']['intensity'];
-
+        $weights['shade'] += ((1 - abs($intensity - 0.5)) * 1.5) * $this->config['weights']['intensity'];
+    
         // Normalize weights
         $total = array_sum($weights);
         if ($total > 0) {
@@ -399,7 +399,10 @@ class CharacterSelector {
                 $w /= $total;
             });
         }
-
+    
+        // Give additional boost to shade weights after normalization
+        $weights['shade'] *= 1.2;
+    
         return $weights;
     }
 
