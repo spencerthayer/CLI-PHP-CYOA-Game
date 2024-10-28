@@ -277,6 +277,7 @@ $current_iteration = 0;
 
 // Initialize scene_data for image generation
 $scene_data = null;
+$should_make_api_call = true;
 
 while (true) {
     if ($current_iteration++ >= $max_iterations) {
@@ -284,13 +285,13 @@ while (true) {
         break;
     }
 
-    if (!isset($skip_api_call) || !$skip_api_call) {
+    if ($should_make_api_call && !isset($skip_api_call)) {
         $data = [
             'model' => 'gpt-4o-mini',
             'messages' => $conversation,
-            'max_tokens' => 1000, // Reintroduced max_tokens
+            'max_tokens' => 1000,
             'temperature' => 0.8,
-            'response_format' => $response_format, // Keeping response_format as per instructions
+            'response_format' => $response_format,
         ];
 
         debug_log("Sending request to GPT-4o-mini: " . json_encode($data));
@@ -350,6 +351,9 @@ while (true) {
     $user_input = trim(fgets(STDIN));
     debug_log("User input received: $user_input");
 
+    // Reset API call flag
+    $should_make_api_call = false;
+
     // Handle special commands first
     if (strtolower($user_input) == 'q') {
         echo colorize("\n[bold][yellow]Thank you for playing 'The Quest of the Forgotten Realm'![/yellow][/bold]\n");
@@ -365,6 +369,7 @@ while (true) {
             unlink($game_history_file);
             debug_log("Game history file deleted for new game.");
         }
+        $should_make_api_call = true;
         continue;
     }
 
@@ -376,35 +381,28 @@ while (true) {
             if (!empty($ascii_art)) {
                 echo "\n" . $ascii_art . "\n\n";
                 // Redisplay the current scene narrative and options
-                echo colorize($scene_data->narrative) . "\n\n";
-                echo colorize("\n[bold]Choose your next action:[/bold]\n");
-                foreach ($scene_data->options as $index => $option) {
-                    $number = $index + 1;
-                    echo colorize("[cyan]{$number}. {$option}[/cyan]\n");
-                }
-                // Add additional options
-                echo "\n";
-                echo colorize("[cyan](g) Generate an image of this scene[/cyan]\n");
-                echo colorize("[cyan](q) Quit the game[/cyan]\n");
-                echo colorize("[cyan](n) Start a new game[/cyan]\n");
+                process_scene($scene_data, $api_key);
             }
         } else {
             echo colorize("[red]No scene data available to generate an image.[/red]\n");
         }
-        // Skip the rest of the loop and go back to getting input
-        unset($skip_api_call);  // Make sure we don't skip the next API call when needed
         continue;
     }
 
     // Handle regular number inputs
     if (!preg_match('/^[1-4]$/', $user_input)) {
         echo colorize("[red]Invalid input. Please enter a number between 1-4, 'g' for image, 'q' to quit, or 'n' for new game.[/red]\n");
+        // Redisplay the current scene
+        if ($scene_data) {
+            process_scene($scene_data, $api_key);
+        }
         continue;
     }
 
     // Process valid number input
     $conversation[] = ['role' => 'user', 'content' => $user_input];
     debug_log("Updated conversation after user input: " . json_encode($conversation));
+    $should_make_api_call = true;
 
     // Save the updated conversation history
     $write_success = file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
