@@ -210,13 +210,13 @@ class CharacterSelector {
         $this->blockchars = [
             ['char' => '▌', 'weight' => 0.5],
             ['char' => '▐', 'weight' => 0.5],
-            ['char' => '▀', 'weight' => 0.5],
-            ['char' => '▄', 'weight' => 0.5],
+            // ['char' => '▀', 'weight' => 0.5],
+            // ['char' => '▄', 'weight' => 0.5],
             ['char' => '█', 'weight' => 1.0],
             ['char' => '▚', 'weight' => 0.5],
             ['char' => '▞', 'weight' => 0.5],
-            ['char' => '▟', 'weight' => 0.75],
-            ['char' => '▙', 'weight' => 0.75]
+            // ['char' => '▟', 'weight' => 0.75],
+            // ['char' => '▙', 'weight' => 0.75]
         ];
         
         // Progressive characters for smooth gradients
