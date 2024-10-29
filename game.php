@@ -234,6 +234,7 @@ if (file_exists($game_history_file)) {
                 $scene_data = json_decode($last_assistant_message);
                 if ($scene_data) {
                     process_scene($scene_data, $api_key);
+                    $should_make_api_call = false; // Prevent automatic API call
                 }
             }
         }
@@ -242,6 +243,7 @@ if (file_exists($game_history_file)) {
     echo colorize("[bold][green]Starting a new adventure in 'The Quest of the Forgotten Realm'![/green][/bold]\n");
     $conversation[] = ['role' => 'system', 'content' => $system_prompt];
     $seed = time();
+    $should_make_api_call = true; // Explicitly set for new game
 }
 
 // Ensure the images directory exists
@@ -263,17 +265,18 @@ function removeImageAndDirectory() {
     }
 }
 
-// Main game loop
+// Initialize variables before the main game loop
 $max_iterations = 1000;
 $current_iteration = 0;
 $should_make_api_call = true;
+$last_user_input = '';
 
 // Modify the initialization section (before the main game loop)
 $user_prefs = load_user_preferences($user_prefs_file);
 $generate_image_toggle = isset($user_prefs['generate_images']) ? $user_prefs['generate_images'] : false;
 
 while ($current_iteration++ < $max_iterations) {
-    if ($should_make_api_call) {
+    if ($should_make_api_call && validateApiCall($conversation, $last_user_input)) {
         $data = [
             'model' => 'gpt-4o-mini',
             'messages' => $conversation,
@@ -336,6 +339,7 @@ while ($current_iteration++ < $max_iterations) {
 
     echo colorize("\n[cyan]Your choice: [/cyan]");
     $user_input = trim(fgets(STDIN));
+    $last_user_input = $user_input;  // Store for validation
 
     if (strtolower($user_input) == 'q') {
         echo colorize("\n[bold][yellow]Thank you for playing 'The Quest of the Forgotten Realm'![/yellow][/bold]\n");
@@ -398,5 +402,26 @@ function load_user_preferences($user_prefs_file) {
 function save_user_preferences($user_prefs_file, $prefs) {
     file_put_contents($user_prefs_file, json_encode($prefs), LOCK_EX);
     chmod($user_prefs_file, 0600);
+}
+
+function validateApiCall($conversation, $user_input) {
+    // Don't make API call if there's no user input
+    if (empty($user_input)) {
+        return false;
+    }
+
+    // Don't make API call if the last message was from the assistant
+    $last_message = end($conversation);
+    if ($last_message && $last_message['role'] === 'assistant') {
+        return false;
+    }
+
+    // Validate user input format
+    if (!in_array(strtolower($user_input), ['t', 'g', 'n', 'q']) && 
+        !preg_match('/^[1-4]$/', $user_input)) {
+        return false;
+    }
+
+    return true;
 }
 ?>
