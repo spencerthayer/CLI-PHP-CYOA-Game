@@ -36,7 +36,7 @@ $config = [
         'gradient' => 0.8,   // Weight for average gradient
         'intensity' => 0.2   // Weight for mean intensity
     ],
-    'random_factor' => 0,    // Factor to introduce randomness in character selection
+    'random_factor' => 0.05,    // Factor to introduce randomness in character selection
     'region_size' => 4       // Size of the local region for analysis (5x5)
 ];
 
@@ -173,30 +173,6 @@ class CharacterSelector {
     private $progressivechars;
     private $shadechars;
     private $config;
-    
-    // Enhanced feature weights with context
-    private $feature_weights = [
-        'edge' => [
-            'weight' => 0.1,      // Reduced from 0.35 to de-emphasize edges
-            'threshold' => 0.3,
-            'preferred_chars' => 'block'
-        ],
-        'texture' => [
-            'weight' => 0.2,      // Reduced from 0.25 to de-emphasize texture
-            'threshold' => 0.3,
-            'preferred_chars' => 'alpha'
-        ],
-        'gradient' => [
-            'weight' => 0.2,      // Moderate weight for gradual transitions
-            'threshold' => 0.2,
-            'preferred_chars' => 'progressive'
-        ],
-        'smoothness' => [
-            'weight' => 0.75,      // Increased significantly to favor shading
-            'threshold' => 0.1,
-            'preferred_chars' => 'shade'
-        ]
-    ];
 
     public function __construct($config) {
         $this->config = $config;
@@ -208,27 +184,37 @@ class CharacterSelector {
     private function initializeCharacterSets() {
         // Block characters for strong edges and geometric shapes
         $this->blockchars = [
-            ['char' => '▌', 'weight' => 0.5],
-            ['char' => '▐', 'weight' => 0.5],
-            // ['char' => '▀', 'weight' => 0.5],
-            // ['char' => '▄', 'weight' => 0.5],
-            ['char' => '█', 'weight' => 1.0],
+            // ['char' => '▌', 'weight' => 0.5],
+            // ['char' => '▐', 'weight' => 0.5],
+            // ['char' => '█', 'weight' => 1.0],
+            ['char' => '▀', 'weight' => 0.5],
+            ['char' => '▄', 'weight' => 0.5],
             ['char' => '▚', 'weight' => 0.5],
             ['char' => '▞', 'weight' => 0.5],
             // ['char' => '▟', 'weight' => 0.75],
-            // ['char' => '▙', 'weight' => 0.75]
+            // ['char' => '▙', 'weight' => 0.75],
+            // ['char' => ' ', 'weight' => 0.0],
+            ['char' => '░', 'weight' => 0.25],
+            // ['char' => '▒', 'weight' => 0.15],
+            // ['char' => '▓', 'weight' => 0.75],
+            // ['char' => '█', 'weight' => 1.0]
         ];
         
         // Progressive characters for smooth gradients
         $this->progressivechars = [
             ['char' => '▁', 'weight' => 0.125],
-            ['char' => '▂', 'weight' => 0.25],
+            // ['char' => '▂', 'weight' => 0.25],
             ['char' => '▃', 'weight' => 0.375],
-            ['char' => '▄', 'weight' => 0.5],
+            // ['char' => '▄', 'weight' => 0.5],
             ['char' => '▅', 'weight' => 0.625],
-            ['char' => '▆', 'weight' => 0.75],
+            // ['char' => '▆', 'weight' => 0.75],
             ['char' => '▇', 'weight' => 0.875],
-            ['char' => '█', 'weight' => 1.0]
+            // ['char' => '█', 'weight' => 1.0],
+            // ['char' => ' ', 'weight' => 0.0],
+            ['char' => '░', 'weight' => 0.25],
+            // ['char' => '▒', 'weight' => 0.5],
+            // ['char' => '▓', 'weight' => 0.75],
+            // ['char' => '█', 'weight' => 1.0]
         ];
         
         // Alpha characters ordered by visual density
@@ -379,11 +365,11 @@ class CharacterSelector {
     
         // Reduce edge influence
         $edge_strength = $analysis['edge'] * 0.5; // Dampen edge detection
-        $weights['block'] += $edge_strength * $this->config['weights']['edge'];
+        $weights['progressive'] += $edge_strength * $this->config['weights']['edge'];
     
         // Reduce variance influence
         $variance = $analysis['variance'] * 0.5; // Dampen texture detection
-        $weights['alpha'] += $variance * $this->config['weights']['variance'];
+        $weights['block'] += $variance * $this->config['weights']['variance'];
     
         // Moderate gradient influence
         $gradient = $analysis['gradient'];
@@ -461,11 +447,11 @@ $ascii_art = "";
 
 // Define the size of the local region for analysis (e.g., 5x5)
 $region_size = $config['region_size'];
-$half_region = floor($region_size / 2);
+$half_region = floor($region_size / 3);
 
 // Calculate step sizes based on scale and region size
-$step_x = $scale;
-$step_y = floor($scale * $char_aspect);
+$step_x = $scale * $half_region;
+$step_y = floor($scale * $char_aspect) * $half_region;
 
 // Ensure step sizes are at least 1 to prevent infinite loops
 $step_x = max(1, $step_x);

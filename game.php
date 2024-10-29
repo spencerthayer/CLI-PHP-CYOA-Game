@@ -128,6 +128,7 @@ function process_scene($scene_data, $api_key) {
     
     // Add additional options
     echo "\n"; // Add spacing
+    echo colorize("[cyan](t) Type in your own action[/cyan]\n");  // Custom action option added
     echo colorize("[cyan](g) Generate an image of this scene[/cyan]\n");
     echo colorize("[cyan](q) Quit the game[/cyan]\n");
     echo colorize("[cyan](n) Start a new game[/cyan]\n");
@@ -369,8 +370,39 @@ while (true) {
         continue;
     }
 
-    if (!preg_match('/^[1-4]$/', $user_input)) {
-        echo colorize("[red]Invalid input. Please enter a number between 1-4, 'g' for image, 'q' to quit, or 'n' for new game.[/red]\n");
+    if (strtolower($user_input) == 't') {  // New 't' option for typing custom actions
+        echo colorize("\n[cyan]Type your action: [/cyan]");
+        $custom_action = trim(fgets(STDIN));
+        
+        if (!empty($custom_action)) {
+            $timestamp = time();
+            $conversation[] = [
+                'role' => 'user',
+                'content' => $custom_action,
+                'timestamp' => $timestamp
+            ];
+            $seed = $timestamp;
+            debug_log("Updated conversation with custom action: " . json_encode($conversation));
+            $should_make_api_call = true;
+            
+            $write_success = file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
+            if ($write_success === false) {
+                echo "Error: Unable to write to the game history file.\n";
+                exit(1);
+            }
+            chmod($game_history_file, 0600);
+            continue;
+        } else {
+            echo colorize("[red]No action entered. Please try again.[/red]\n");
+            if ($scene_data) {
+                process_scene($scene_data, $api_key);
+            }
+            continue;
+        }
+    }
+
+    if (!preg_match('/^[1-4]$/', $user_input)) {  // Updated validation check
+        echo colorize("[red]Invalid input. Please enter a number between 1-4, 't' to type an action, 'g' for image, 'q' to quit, or 'n' for new game.[/red]\n");
         if ($scene_data) {
             process_scene($scene_data, $api_key);
         }
