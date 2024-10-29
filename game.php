@@ -10,6 +10,7 @@ $game_history_file = __DIR__ . '/.game_history';
 $debugging = in_array('--debug', $argv);
 $chat_url = 'https://api.openai.com/v1/chat/completions';
 $generate_image_toggle = false;  // Initialize as off by default
+$user_prefs_file = __DIR__ . '/.user_prefs';
 
 // Function to create a new game by checking for the '--new' flag
 function check_for_new_game($argv, $game_history_file) {
@@ -70,7 +71,39 @@ function generate_ascii_art($image_path) {
     return $output;
 }
 
-// Function to generate an image using Pollinations.ai with a reproducible seed
+// Add this new function with the other utility functions
+function show_loading_animation($message = "Generating image") {
+    $frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+    $frameCount = count($frames);
+    
+    // Start on a new line
+    echo "\n";
+    
+    // Create a separate process for the animation
+    $pid = pcntl_fork();
+    
+    if ($pid == 0) {  // Child process
+        $i = 0;
+        while (true) {
+            echo "\r" . $frames[$i % $frameCount] . " $message...";
+            usleep(100000); // 0.1 second delay
+            $i++;
+            flush();
+        }
+    }
+    
+    return $pid;
+}
+
+function stop_loading_animation($pid) {
+    if ($pid) {
+        posix_kill($pid, SIGTERM);
+        pcntl_wait($pid); // Prevent zombie process
+        echo "\r" . str_repeat(" ", 50) . "\r"; // Clear the line
+    }
+}
+
+// Modify the generate_image function
 function generate_image($prompt, $seed) {
     global $debugging;
     $prompt_url = urlencode("low-res 8bit ANSI art: $prompt");
@@ -80,7 +113,14 @@ function generate_image($prompt, $seed) {
         echo "[DEBUG] Generated Pollinations URL: $url\n";
     }
     
+    // Start loading animation
+    $loading_pid = show_loading_animation();
+    
     $image_data = file_get_contents($url);
+    
+    // Stop loading animation
+    stop_loading_animation($loading_pid);
+    
     if ($image_data === false) {
         echo "Error downloading image from Pollinations.ai.\n";
         return null;
@@ -228,6 +268,10 @@ $max_iterations = 1000;
 $current_iteration = 0;
 $should_make_api_call = true;
 
+// Modify the initialization section (before the main game loop)
+$user_prefs = load_user_preferences($user_prefs_file);
+$generate_image_toggle = isset($user_prefs['generate_images']) ? $user_prefs['generate_images'] : false;
+
 while ($current_iteration++ < $max_iterations) {
     if ($should_make_api_call) {
         $data = [
@@ -309,6 +353,8 @@ while ($current_iteration++ < $max_iterations) {
 
     if (strtolower($user_input) == 'g') {
         $generate_image_toggle = !$generate_image_toggle;
+        $user_prefs['generate_images'] = $generate_image_toggle;
+        save_user_preferences($user_prefs_file, $user_prefs);
         echo colorize("\n[bold][yellow]Image generation is now " . ($generate_image_toggle ? "On" : "Off") . "[/yellow][/bold]\n");
         if (isset($scene_data)) process_scene($scene_data, $api_key);
         continue;
@@ -338,5 +384,19 @@ while ($current_iteration++ < $max_iterations) {
     $conversation[] = ['role' => 'user', 'content' => $user_input, 'timestamp' => time()];
     $should_make_api_call = true;
     file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
+}
+
+// Add this new function after other utility functions
+function load_user_preferences($user_prefs_file) {
+    if (file_exists($user_prefs_file)) {
+        $prefs = json_decode(file_get_contents($user_prefs_file), true);
+        return is_array($prefs) ? $prefs : [];
+    }
+    return [];
+}
+
+function save_user_preferences($user_prefs_file, $prefs) {
+    file_put_contents($user_prefs_file, json_encode($prefs), LOCK_EX);
+    chmod($user_prefs_file, 0600);
 }
 ?>

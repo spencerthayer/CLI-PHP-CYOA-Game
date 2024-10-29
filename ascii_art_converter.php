@@ -216,15 +216,17 @@ class CharacterSelector {
             // ['char' => '▓', 'weight' => 0.75],
             // ['char' => '█', 'weight' => 1.0]
         ];
-        
+
         // Alpha characters ordered by visual density
-        // $alphaOrder = "`.'\",:;!i|Il()[]{}?-_+~<>iv^*";
-        $alphaOrder = "`.-'\":_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#\$Bg0MNWQ%&@";
+        $alphaOrder = "`.'\",:;!i|Il()[]{}?-_+~<>iv^*";
+        // $alphaOrder = "`.-'\":_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#\$Bg0MNWQ%&@";
         $this->alphachars = array_map(function($char) use ($alphaOrder) {
-            $weight = (strpos($alphaOrder, $char) + 1) / strlen($alphaOrder);
+            $weight = (mb_strpos($alphaOrder, $char) + 1) / mb_strlen($alphaOrder);
             return ['char' => $char, 'weight' => $weight];
-        }, str_split($alphaOrder));
+        }, preg_split('//u', $alphaOrder, -1, PREG_SPLIT_NO_EMPTY));
         
+
+        $braille = "⠂⠄⡀⢀⠈⠐⠠⡀⠂⠃⠉⠘⠰⢁⣀⠤⠇⠋⢃⢉⠋⠙⠸⠴⠦⠇⠴⠜⠱⢇⠹⠼⠧⠏⠵⡇⡙⡇⠽⠟⢧⠻⡛⡗⠿⠿⢿⣯⡿";
         // Shade characters for smooth areas
         $this->shadechars = [
             ['char' => ' ', 'weight' => 0.0],
