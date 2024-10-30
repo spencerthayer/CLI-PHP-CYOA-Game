@@ -172,6 +172,7 @@ class CharacterSelector {
     private $blockchars;
     private $progressivechars;
     private $shadechars;
+    private $braillechars;
     private $config;
 
     public function __construct($config) {
@@ -235,6 +236,32 @@ class CharacterSelector {
             ['char' => '▓', 'weight' => 0.75],
             ['char' => '█', 'weight' => 1.0]
         ];
+
+        // New Braille character set with weights based on dot count
+        $brailleGroups = [
+            // 3 dots (weight: 0.33)
+            ['chars' => '⠂⠄⡀⢀⠈⠐⠠⡀⠂', 'weight' => 0.33],
+            // 4 dots (weight: 0.44)
+            ['chars' => '⠃⠉⠘⠰⢁⣀⠤', 'weight' => 0.44],
+            // 5 dots (weight: 0.55)
+            ['chars' => '⠇⠋⢃⢉⠋⠙⠸⠴⠦⠇⠴⠜⠱', 'weight' => 0.55],
+            // 6 dots (weight: 0.66)
+            ['chars' => '⢇⠹⠼⠧⠏⠵⡇⡙⡇', 'weight' => 0.66],
+            // 7 dots (weight: 0.77)
+            ['chars' => '⠽⠟⢧⠻⡛⡗', 'weight' => 0.77],
+            // 8 dots (weight: 0.88)
+            ['chars' => '⠿⠿', 'weight' => 0.88],
+            // 9 dots (weight: 1.0)
+            ['chars' => '⢿⣯⡿', 'weight' => 1.0]
+        ];
+
+        $this->braillechars = [];
+        foreach ($brailleGroups as $group) {
+            $chars = preg_split('//u', $group['chars'], -1, PREG_SPLIT_NO_EMPTY);
+            foreach ($chars as $char) {
+                $this->braillechars[] = ['char' => $char, 'weight' => $group['weight']];
+            }
+        }
     }
 
     // Calculate luminance using Rec. 709
@@ -362,7 +389,8 @@ class CharacterSelector {
             'block' => 0,
             'progressive' => 0,
             'alpha' => 0,
-            'shade' => 0
+            'shade' => 0,
+            'braille' => 0  // Add braille weight
         ];
     
         // Reduce edge influence
@@ -380,6 +408,12 @@ class CharacterSelector {
         // Boost shading influence
         $intensity = $analysis['intensity'];
         $weights['shade'] += ((1 - abs($intensity - 0.5)) * 1.5) * $this->config['weights']['intensity'];
+    
+        // Add braille weight calculation
+        if ($analysis['intensity'] < 0.4 && $analysis['variance'] > 0.1) {
+            $weights['braille'] += 0.6;
+            $weights['shade'] *= 0.2;
+        }
     
         // Normalize weights
         $total = array_sum($weights);
@@ -418,6 +452,7 @@ class CharacterSelector {
             'block' => $this->blockchars,
             'progressive' => $this->progressivechars,
             'alpha' => $this->alphachars,
+            'braille' => $this->braillechars,
             default => $this->shadechars
         };
 

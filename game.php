@@ -106,7 +106,7 @@ function stop_loading_animation($pid) {
 // Modify the generate_image function
 function generate_image($prompt, $seed) {
     global $debugging;
-    $prompt_url = urlencode("low-res 8bit ANSI art: $prompt");
+    $prompt_url = urlencode("8bit ANSI game: $prompt");
     $url = "https://image.pollinations.ai/prompt/$prompt_url?model=flux&nologo=true&width=384&height=192&seed=$seed";
 
     if ($debugging) {
@@ -163,7 +163,7 @@ function process_scene($scene_data, $api_key) {
 
     // Generate the image if the toggle is on
     if ($generate_image_toggle) {
-        $image_prompt = "8bit game, " . $scene_data->image;
+        $image_prompt = $scene_data->image;
         $ascii_art = process_image_from_text($image_prompt, $seed);
 
         if (!empty($ascii_art)) {
