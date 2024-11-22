@@ -261,7 +261,7 @@ function process_scene($scene_data, $api_key) {
 
 // Updated system prompt
 $system_prompt = "
-You are an interactive text-based adventure game called 'The Quest of the Forgotten Realm.'
+You are an interactive text-based adventure game called 'The Dying Earth.'
 
 This is a grimdark world set in the twilight of civilization, where magic has decayed, the sun is dying, and ancient horrors lurk beneath a crumbling earth. The story should evoke the style and prose of Jack Vance, using rich, archaic language and an atmosphere of cosmic horror. Each scene is to be vivid, darkly poetic, and filled with the weight of a world in decline, offering the player a sense of despair, decay, and alien mysteries.
 
@@ -294,17 +294,30 @@ if (file_exists($game_history_file)) {
                     $scene_data = json_decode($arguments);
                     $scene_data->timestamp = $message['timestamp'];
                     $is_loading_saved_game = true;
+                    
+                    // Load and display the saved image if it exists
+                    if ($generate_image_toggle) {
+                        $image_path = __DIR__ . "/images/temp_image_{$scene_data->timestamp}.jpg";
+                        if (file_exists($image_path)) {
+                            if ($debugging) {
+                                echo "[DEBUG] Loading saved image for timestamp: {$scene_data->timestamp}\n";
+                            }
+                            echo colorize("[bold][green]Welcome back to 'The Dying Earth'![/green][/bold]\n");
+                            $ascii_art = generate_ascii_art($image_path);
+                            if (!empty($ascii_art)) {
+                                echo "\n" . $ascii_art . "\n\n";
+                            }
+                        }
+                    }
+                    
+                    process_scene($scene_data, $api_key);
                     break;
                 }
-            }
-            if ($is_loading_saved_game && isset($scene_data)) {
-                echo colorize("[bold][green]Welcome back to 'The Quest of the Forgotten Realm'![/green][/bold]\n");
-                process_scene($scene_data, $api_key);
             }
         }
     }
 } else {
-    echo colorize("[bold][green]Starting a new adventure in 'The Quest of the Forgotten Realm'![/green][/bold]\n");
+    echo colorize("[bold][green]Starting a new adventure in 'The Dying Earth'![/green][/bold]\n");
     $conversation[] = ['role' => 'system', 'content' => $system_prompt];
     $conversation[] = ['role' => 'user', 'content' => 'start game', 'timestamp' => time()];
     $should_make_api_call = true;
@@ -450,7 +463,7 @@ while ($current_iteration++ < $max_iterations) {
 
     // Handle user input
     if (strtolower($user_input) == 'q') {
-        echo colorize("\n[bold][yellow]Thank you for playing 'The Quest of the Forgotten Realm'![/yellow][/bold]\n");
+        echo colorize("\n[bold][yellow]Thank you for playing 'The Dying Earth'![/yellow][/bold]\n");
         break;
     }
 
