@@ -380,6 +380,8 @@ while ($current_iteration++ < $max_iterations) {
                                 'properties' => [
                                     'prompt' => [
                                         'type' => 'string',
+                                        'minCharacters' => 32,
+                                        'maxCharacters' => 128,
                                         'description' => 'A descriptive prompt for generating an 8-bit style image of the current scene'
                                     ]
                                 ],
