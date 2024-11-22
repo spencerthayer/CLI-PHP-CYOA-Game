@@ -130,8 +130,8 @@ function generate_image($prompt, $seed) {
         return null;
     }
     
-    $prompt_url = urlencode("8bit ANSI game: $prompt");
-    $url = "https://image.pollinations.ai/prompt/$prompt_url?model=flux&nologo=true&width=384&height=192&seed=$seed";
+    $prompt_url = urlencode("8bit ANSI $prompt");
+    $url = "https://image.pollinations.ai/prompt/$prompt_url?model=turbo&nologo=true&width=384&height=192&seed=$seed";
 
     if ($debugging) {
         echo "[DEBUG] Generated Pollinations URL: $url\n";
@@ -223,14 +223,9 @@ function process_scene($scene_data, $api_key) {
             return;
         }
 
-        $prompt_url = urlencode("8bit ANSI game: $image_prompt");
-        $model = 'turbo';
-        $url = "https://image.pollinations.ai/prompt/$prompt_url?model=flux&nologo=true&width=384&height=192&seed=$seed";
-        
         // Update scene_data with clean image structure
         $scene_data->image = [
-            'prompt' => $image_prompt,
-            'url' => $url
+            'prompt' => $image_prompt
         ];
         
         $ascii_art = process_image_from_text($image_prompt, $seed);
@@ -352,7 +347,7 @@ while ($current_iteration++ < $max_iterations) {
         ]);
         
         $data = [
-            'model' => 'gpt-4',
+            'model' => 'gpt-4o-mini',
             'messages' => $conversation,
             'max_tokens' => 1000,
             'temperature' => 0.8,
