@@ -23,7 +23,7 @@ if (!$img) {
 
 // Define character aspect ratio
 $char_aspect = 2.5; // Typical terminal character aspect ratio (height/width)
-$scale = 1.5; // Base scale for sampling
+$scale = 1.25; // Base scale for sampling
 $half_region = 2; // Half of the region size for analysis
 
 // Function to get terminal dimensions
@@ -96,9 +96,9 @@ if ($scale_factor < 1) {
     $img = $resized;
 }
 
-// Update step sizes based on new dimensions
-$step_x = max(1, floor($scale * $half_region));
-$step_y = max(1, floor($scale * $char_aspect * $half_region));
+// Update step sizes based on new dimensions - MODIFIED
+$step_x = max(1, (int)floor($scale * $half_region));
+$step_y = max(1, (int)floor($scale * $char_aspect * $half_region));
 
 // Enhanced Configuration Array
 $config = [
@@ -363,7 +363,7 @@ class CharacterSelector {
 
     // Analyze local region characteristics
     private function analyzeRegion($img, $x, $y, $width, $height, $region_size = 5) {
-        $half_size = floor($region_size / 2);
+        $half_size = (int)floor($region_size / 2);
         $samples = [];
         $gradients = [];
         $min_lum = 1.0;
@@ -374,8 +374,8 @@ class CharacterSelector {
             $step = $scale;
             for ($i = -$half_size; $i <= $half_size; $i += $step) {
                 for ($j = -$half_size; $j <= $half_size; $j += $step) {
-                    $px = min(max($x + $i, 0), $width - 1);
-                    $py = min(max($y + $j, 0), $height - 1);
+                    $px = (int)min(max($x + $i, 0), $width - 1);
+                    $py = (int)min(max($y + $j, 0), $height - 1);
 
                     $rgb = imagecolorat($img, $px, $py);
                     $luminance = $this->calculateLuminance($rgb);
@@ -567,9 +567,12 @@ $step_x = max(1, $step_x);
 $step_y = max(1, $step_y);
 
 for ($y = 0; $y <= $height - $half_region; $y += $step_y) {
+    $y_int = (int)$y;
     for ($x = 0; $x <= $width - $half_region; $x += $step_x) {
-        // Get RGB values
-        $rgb = imagecolorat($img, $x, $y);
+        $x_int = (int)$x;
+        
+        // Use integer coordinates for imagecolorat
+        $rgb = imagecolorat($img, $x_int, $y_int);
         $r = ($rgb >> 16) & 0xFF;
         $g = ($rgb >> 8) & 0xFF;
         $b = $rgb & 0xFF;
