@@ -194,7 +194,8 @@ function process_image_from_text($text, $seed) {
 
 // Function to process the scene and generate image
 function process_scene($scene_data, $api_key) {
-    global $debugging, $generate_image_toggle, $seed;
+    global $debugging, $generate_image_toggle;
+    $seed = time();  // Update seed for each new scene
     
     write_debug_log("Processing new scene", [
         'generate_image_toggle' => $generate_image_toggle,
@@ -223,6 +224,7 @@ function process_scene($scene_data, $api_key) {
         }
 
         $prompt_url = urlencode("8bit ANSI game: $image_prompt");
+        $model = 'turbo';
         $url = "https://image.pollinations.ai/prompt/$prompt_url?model=flux&nologo=true&width=384&height=192&seed=$seed";
         
         // Update scene_data with clean image structure
