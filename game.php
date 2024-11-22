@@ -110,36 +110,21 @@ function stop_loading_animation($pid) {
 }
 
 // Modify the generate_image function
-function generate_image($prompt, $seed) {
+function generate_image($prompt, $timestamp) {
     global $debugging;
     
-    // Handle if prompt is an array or object
-    if (is_array($prompt) || is_object($prompt)) {
-        if (isset($prompt['prompt'])) {
-            $prompt = $prompt['prompt'];
-        } elseif (isset($prompt->prompt)) {
-            $prompt = $prompt->prompt;
-        } else {
-            if ($debugging) {
-                echo "[DEBUG] Invalid prompt format: " . print_r($prompt, true) . "\n";
-            }
-            return null;
-        }
-    }
-    
-    // Ensure prompt is a string
     if (!is_string($prompt)) {
         if ($debugging) {
-            echo "[DEBUG] Prompt is not a string: " . gettype($prompt) . "\n";
+            echo "[DEBUG] Invalid prompt format: " . print_r($prompt, true) . "\n";
         }
         return null;
     }
     
     $prompt_url = urlencode("8bit ANSI video game $prompt");
-    $url = "https://image.pollinations.ai/prompt/$prompt_url?nologo=true&width=360&height=160&seed=$seed&model=flux-3d";
+    $url = "https://image.pollinations.ai/prompt/$prompt_url?nologo=true&width=360&height=160&seed=$timestamp&model=flux-3d";
 
     if ($debugging) {
-        echo "[DEBUG] Generated Pollinations URL: $url\n";
+        echo "[DEBUG] Generated Pollinations URL with timestamp: $timestamp\n";
     }
     
     $loading_pid = show_loading_animation();
@@ -153,7 +138,7 @@ function generate_image($prompt, $seed) {
         return null;
     }
     
-    $image_path = __DIR__ . "/images/temp_image_$seed.jpg";
+    $image_path = __DIR__ . "/images/temp_image_$timestamp.jpg";
     file_put_contents($image_path, $image_data);
     return generate_ascii_art($image_path);
 }
@@ -179,39 +164,39 @@ function generate_image_prompt_summary($text) {
 }
 
 // Function to process image from text
-function process_image_from_text($text, $seed) {
+function process_image_from_text($text, $timestamp) {
     global $debugging;
-    // Ensure we're working with a string
     if (is_array($text)) {
         if (isset($text['prompt'])) {
             $text = $text['prompt'];
         } else {
-            return ""; // Return empty string if no prompt found
+            return "";
         }
     }
     $prompt = generate_image_prompt_summary($text);
     if ($debugging) {
-        echo "[DEBUG] Attempting to generate an image with prompt: '$prompt' and seed: $seed\n";
+        echo "[DEBUG] Attempting to generate an image with prompt: '$prompt' and timestamp: $timestamp\n";
     }
-    $ascii_art = generate_image($prompt, $seed);
+    $ascii_art = generate_image($prompt, $timestamp);
     return $ascii_art ?: "";
 }
 
 // Function to process the scene and generate image
 function process_scene($scene_data, $api_key) {
     global $debugging, $generate_image_toggle;
-    // Use the timestamp from scene_data if it exists, otherwise use current time
-    $seed = isset($scene_data->timestamp) ? $scene_data->timestamp : time();
+    
+    // Ensure we have a timestamp
+    if (!isset($scene_data->timestamp)) {
+        $scene_data->timestamp = time();
+    }
     
     write_debug_log("Processing new scene", [
         'generate_image_toggle' => $generate_image_toggle,
-        'seed' => $seed,
+        'timestamp' => $scene_data->timestamp,
         'scene_data' => $scene_data
     ]);
     
-    // Generate the image if the toggle is on
     if ($generate_image_toggle) {
-        // Extract the prompt string properly
         $image_prompt = '';
         if (is_object($scene_data->image)) {
             $image_prompt = $scene_data->image->prompt;
@@ -221,7 +206,6 @@ function process_scene($scene_data, $api_key) {
             $image_prompt = $scene_data->image;
         }
 
-        // Ensure we have a string prompt
         if (!is_string($image_prompt)) {
             if ($debugging) {
                 echo "[DEBUG] Invalid image prompt format: " . print_r($image_prompt, true) . "\n";
@@ -229,13 +213,12 @@ function process_scene($scene_data, $api_key) {
             return;
         }
 
-        // Update scene_data with clean image structure
         $scene_data->image = [
-            'prompt' => $image_prompt
+            'prompt' => $image_prompt,
+            'timestamp' => $scene_data->timestamp
         ];
         
-        // Use the saved timestamp/seed for image generation
-        $ascii_art = process_image_from_text($image_prompt, $seed);
+        $ascii_art = process_image_from_text($image_prompt, $scene_data->timestamp);
 
         if (!empty($ascii_art)) {
             echo "\n" . $ascii_art . "\n\n";
@@ -425,14 +408,16 @@ while ($current_iteration++ < $max_iterations) {
         if (isset($result->choices[0]->message->function_call)) {
             $function_call = $result->choices[0]->message->function_call;
             if ($function_call->name === 'GameResponse') {
+                $current_timestamp = time();
                 $scene_data = json_decode($function_call->arguments);
                 if ($scene_data && isset($scene_data->narrative, $scene_data->options, $scene_data->image)) {
+                    $scene_data->timestamp = $current_timestamp;
                     process_scene($scene_data, $api_key);
                     $conversation[] = [
                         'role' => 'assistant',
                         'content' => '',
                         'function_call' => $function_call,
-                        'timestamp' => time()
+                        'timestamp' => $current_timestamp
                     ];
                     file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
                 }
