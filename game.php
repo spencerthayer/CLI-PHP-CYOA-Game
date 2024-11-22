@@ -575,7 +575,7 @@ while ($current_iteration++ < $max_iterations) {
                 if (isset($scene_data)) {
                     process_scene($scene_data, $api_key);
                 }
-                continue;
+                break 2;
                 
             case 't':
                 echo colorize("\n[cyan]Type your action: [/cyan]");
@@ -591,7 +591,7 @@ while ($current_iteration++ < $max_iterations) {
                         process_scene($scene_data, $api_key);
                     }
                 }
-                continue;
+                break 2;
                 
             case 'n':
                 clearImages();
@@ -602,7 +602,7 @@ while ($current_iteration++ < $max_iterations) {
                 }
                 $should_make_api_call = true;
                 $last_user_input = 'start game';
-                continue;
+                break 2;
         }
         
         // Handle numeric input
