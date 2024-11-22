@@ -287,6 +287,11 @@ if (file_exists($game_history_file)) {
         if ($saved_conversation && is_array($saved_conversation)) {
             $conversation = $saved_conversation;
             $last_assistant_message = null;
+            
+            // Load user preferences first
+            $user_prefs = load_user_preferences($user_prefs_file);
+            $generate_image_toggle = isset($user_prefs['generate_images']) ? $user_prefs['generate_images'] : false;
+            
             foreach (array_reverse($conversation) as $message) {
                 if ($message['role'] === 'assistant' && isset($message['function_call'])) {
                     $function_call = $message['function_call'];
@@ -295,22 +300,46 @@ if (file_exists($game_history_file)) {
                     $scene_data->timestamp = $message['timestamp'];
                     $is_loading_saved_game = true;
                     
-                    // Load and display the saved image if it exists
+                    echo colorize("[bold][green]Welcome back to 'The Dying Earth'![/green][/bold]\n");
+                    
+                    // Check for and display saved image before processing scene
                     if ($generate_image_toggle) {
                         $image_path = __DIR__ . "/images/temp_image_{$scene_data->timestamp}.jpg";
                         if (file_exists($image_path)) {
                             if ($debugging) {
                                 echo "[DEBUG] Loading saved image for timestamp: {$scene_data->timestamp}\n";
                             }
-                            echo colorize("[bold][green]Welcome back to 'The Dying Earth'![/green][/bold]\n");
                             $ascii_art = generate_ascii_art($image_path);
                             if (!empty($ascii_art)) {
                                 echo "\n" . $ascii_art . "\n\n";
                             }
+                        } else {
+                            if ($debugging) {
+                                echo "[DEBUG] No saved image found for timestamp: {$scene_data->timestamp}\n";
+                            }
                         }
                     }
                     
-                    process_scene($scene_data, $api_key);
+                    // Display scene text and options
+                    echo "\n" . colorize($scene_data->narrative) . "\n\n";
+                    echo colorize("\n[bold]Choose your next action:[/bold]\n");
+
+                    foreach ($scene_data->options as $index => $option) {
+                        $number = $index + 1;
+                        echo colorize("[cyan]{$number}. {$option}[/cyan]\n");
+                    }
+
+                    // Add additional options
+                    echo "\n";
+                    echo colorize("[green](t) Type in your own action[/green]");
+                    echo " | ";
+                    echo colorize("[green](g) Toggle image generation (" . ($generate_image_toggle ? "On" : "Off") . ")[/green]");
+                    echo " | ";
+                    echo colorize("[green](q) Quit the game[/green]");
+                    echo " | ";
+                    echo colorize("[green](n) Start a new game[/green]");
+                    echo "\n";
+                    
                     break;
                 }
             }
