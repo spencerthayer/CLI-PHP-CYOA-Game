@@ -13,10 +13,17 @@ $generate_image_toggle = false;  // Initialize as off by default
 $user_prefs_file = __DIR__ . '/.user_prefs';
 $debug_log_file = __DIR__ . '/.debug_log';
 
-// Near the top of the file, add:
+// Initialize key variables at the start
+$max_iterations = 1000;
+$current_iteration = 0;
+$user_input = '';
+$user_prefs = [];
+
+// Near the top where other variables are initialized
 $is_loading_saved_game = false;
-$should_make_api_call = false;  // Initialize as false
-$last_user_input = null;
+$should_make_api_call = false;
+$last_user_input = '';
+$scene_data = null;
 
 // Function to create a new game by checking for the '--new' flag
 function check_for_new_game($argv, $game_history_file) {
@@ -359,7 +366,7 @@ if (!is_dir($images_dir)) {
     mkdir($images_dir, 0755, true);
 }
 
-// Modify the removeImageAndDirectory function to be clearImages
+// Modify the clearImages function to preserve static images
 function clearImages() {
     $directory_path = __DIR__ . '/images';
     if (is_dir($directory_path)) {
@@ -370,17 +377,87 @@ function clearImages() {
     }
 }
 
-// Initialize variables before the main game loop
-$max_iterations = 1000;
-$current_iteration = 0;
+// Add new function to display title screen
+function display_title_screen() {
+    $title_image_path = __DIR__ . '/images/static_title.png';
+    
+    // Generate title image if it doesn't exist
+    if (!file_exists($title_image_path)) {
+        $title_url = "https://image.pollinations.ai/prompt/" . urlencode("8bit pixel art game title screen for The Dying Earth, dark fantasy RPG game") . "?nologo=true&width=360&height=160&seed=123&model=flux";
+        $image_data = file_get_contents($title_url);
+        
+        if ($image_data !== false) {
+            file_put_contents($title_image_path, $image_data);
+        }
+    }
+    
+    // Display the title screen if the image exists
+    if (file_exists($title_image_path)) {
+        $ascii_art = generate_ascii_art($title_image_path);
+        if (!empty($ascii_art)) {
+            echo "\n" . $ascii_art . "\n\n";
+        }
+    }
+    
+    echo colorize("[bold][green]Starting a new adventure in 'The Dying Earth'![/green][/bold]\n");
+}
 
-// Modify the initialization section (before the main game loop)
-$user_prefs = load_user_preferences($user_prefs_file);
-$generate_image_toggle = isset($user_prefs['generate_images']) ? $user_prefs['generate_images'] : false;
+// Modify the new game handling in the main loop
+if (strtolower($user_input) == 'n') {
+    clearImages(); // Only clears temp images
+    display_title_screen();
+    $conversation = [['role' => 'system', 'content' => $system_prompt]];
+    if (file_exists($game_history_file)) unlink($game_history_file);
+    $should_make_api_call = true;
+    $last_user_input = 'start game';
+    return;
+}
+
+// Also modify the initial game start to show title screen
+if (!file_exists($game_history_file)) {
+    display_title_screen();
+    $conversation[] = ['role' => 'system', 'content' => $system_prompt];
+    $conversation[] = ['role' => 'user', 'content' => 'start game', 'timestamp' => time()];
+    $should_make_api_call = true;
+    $last_user_input = 'start game';
+}
+
+// Update the validateApiCall function
+function validateApiCall($conversation, $user_input) {
+    // Ensure $user_input is a string
+    if (!is_string($user_input)) {
+        return false;
+    }
+
+    // Allow 'start game' for the initial scene
+    if ($user_input === 'start game') {
+        return true;
+    }
+
+    // Don't make API call if there's no user input
+    if (empty($user_input)) {
+        return false;
+    }
+
+    // Don't make API call if the last message was from the assistant
+    $last_message = end($conversation);
+    if ($last_message && $last_message['role'] === 'assistant') {
+        return false;
+    }
+
+    // Validate user input format
+    if (!in_array(strtolower($user_input), ['t', 'g', 'n', 'q']) && 
+        !preg_match('/^[1-4]$/', $user_input)) {
+        return false;
+    }
+
+    return true;
+}
 
 // Main game loop
 while ($current_iteration++ < $max_iterations) {
-    if ($should_make_api_call && validateApiCall($conversation, $last_user_input)) {
+    // Only make API call if we have valid input and should make the call
+    if ($should_make_api_call && !empty($last_user_input) && validateApiCall($conversation, $last_user_input)) {
         write_debug_log("Making API call", [
             'conversation_length' => count($conversation),
             'last_user_input' => $last_user_input
@@ -480,68 +557,66 @@ while ($current_iteration++ < $max_iterations) {
     echo colorize("\n[cyan]Your choice: [/cyan]");
     $user_input = trim(fgets(STDIN));
     
-    write_debug_log("User input received", [
-        'input' => $user_input,
-        'is_loading_saved_game' => $is_loading_saved_game
-    ]);
-
-    // Reset loading saved game flag after first input
-    if ($is_loading_saved_game) {
-        $is_loading_saved_game = false;
-    }
-
-    // Handle user input
-    if (strtolower($user_input) == 'q') {
-        echo colorize("\n[bold][yellow]Thank you for playing 'The Dying Earth'![/yellow][/bold]\n");
-        break;
-    }
-
-    if (strtolower($user_input) == 'n') {
-        echo colorize("\n[bold][yellow]Starting a new game...[/yellow][/bold]\n");
-        $conversation = [['role' => 'system', 'content' => $system_prompt]];
-        if (file_exists($game_history_file)) unlink($game_history_file);
-        clearImages(); // Only clear images when starting a new game
-        $should_make_api_call = true;
-        $last_user_input = 'start game';
-        continue;
-    }
-
-    if (strtolower($user_input) == 'g') {
-        $generate_image_toggle = !$generate_image_toggle;
-        $user_prefs['generate_images'] = $generate_image_toggle;
-        save_user_preferences($user_prefs_file, $user_prefs);
-        echo colorize("\n[bold][yellow]Image generation is now " . ($generate_image_toggle ? "On" : "Off") . "[/yellow][/bold]\n");
-        if (isset($scene_data)) process_scene($scene_data, $api_key);
-        continue;
-    }
-
-    if (strtolower($user_input) == 't') {
-        echo colorize("\n[cyan]Type your action: [/cyan]");
-        $custom_action = trim(fgets(STDIN));
-        if (!empty($custom_action)) {
-            $conversation[] = ['role' => 'user', 'content' => $custom_action, 'timestamp' => time()];
-            $should_make_api_call = true;
-            file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
-            continue;
-        } else {
-            echo colorize("[red]No action entered. Please try again.[/red]\n");
-            if ($scene_data) process_scene($scene_data, $api_key);
-            continue;
+    // Process user input only if it's not empty
+    if (!empty($user_input)) {
+        $user_input = strtolower($user_input);
+        
+        // Handle different input cases
+        switch($user_input) {
+            case 'q':
+                echo colorize("\n[bold][yellow]Thank you for playing 'The Dying Earth'![/yellow][/bold]\n");
+                exit;
+                
+            case 'g':
+                $generate_image_toggle = !$generate_image_toggle;
+                $user_prefs['generate_images'] = $generate_image_toggle;
+                save_user_preferences($user_prefs_file, $user_prefs);
+                echo colorize("\n[bold][yellow]Image generation is now " . ($generate_image_toggle ? "On" : "Off") . "[/yellow][/bold]\n");
+                if (isset($scene_data)) {
+                    process_scene($scene_data, $api_key);
+                }
+                continue;
+                
+            case 't':
+                echo colorize("\n[cyan]Type your action: [/cyan]");
+                $custom_action = trim(fgets(STDIN));
+                if (!empty($custom_action)) {
+                    $conversation[] = ['role' => 'user', 'content' => $custom_action, 'timestamp' => time()];
+                    $should_make_api_call = true;
+                    $last_user_input = $custom_action;
+                    file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
+                } else {
+                    echo colorize("[red]No action entered. Please try again.[/red]\n");
+                    if ($scene_data) {
+                        process_scene($scene_data, $api_key);
+                    }
+                }
+                continue;
+                
+            case 'n':
+                clearImages();
+                display_title_screen();
+                $conversation = [['role' => 'system', 'content' => $system_prompt]];
+                if (file_exists($game_history_file)) {
+                    unlink($game_history_file);
+                }
+                $should_make_api_call = true;
+                $last_user_input = 'start game';
+                continue;
         }
-    }
-
-    if (!preg_match('/^[1-4]$/', $user_input)) {
-        echo colorize("[red]Invalid input. Please enter a number between 1-4, 't' to type an action, 'g' for image, 'q' to quit, or 'n' for new game.[/red]\n");
-        if ($scene_data) process_scene($scene_data, $api_key);
-        continue;
-    }
-
-    // Set up for next API call
-    if (preg_match('/^[1-4]$/', $user_input) || strtolower($user_input) == 't') {
-        $conversation[] = ['role' => 'user', 'content' => $user_input, 'timestamp' => time()];
-        $should_make_api_call = true;
-        $last_user_input = $user_input;
-        file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
+        
+        // Handle numeric input
+        if (preg_match('/^[1-4]$/', $user_input)) {
+            $conversation[] = ['role' => 'user', 'content' => $user_input, 'timestamp' => time()];
+            $should_make_api_call = true;
+            $last_user_input = $user_input;
+            file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
+        } else {
+            echo colorize("[red]Invalid input. Please enter a number between 1-4, 't' to type an action, 'g' for image, 'q' to quit, or 'n' for new game.[/red]\n");
+            if ($scene_data) {
+                process_scene($scene_data, $api_key);
+            }
+        }
     }
 }
 
@@ -557,32 +632,6 @@ function load_user_preferences($user_prefs_file) {
 function save_user_preferences($user_prefs_file, $prefs) {
     file_put_contents($user_prefs_file, json_encode($prefs), LOCK_EX);
     chmod($user_prefs_file, 0600);
-}
-
-function validateApiCall($conversation, $user_input) {
-    // Allow 'start game' for the initial scene
-    if ($user_input === 'start game') {
-        return true;
-    }
-
-    // Don't make API call if there's no user input
-    if (empty($user_input)) {
-        return false;
-    }
-
-    // Don't make API call if the last message was from the assistant
-    $last_message = end($conversation);
-    if ($last_message && $last_message['role'] === 'assistant') {
-        return false;
-    }
-
-    // Validate user input format
-    if (!in_array(strtolower($user_input), ['t', 'g', 'n', 'q']) && 
-        !preg_match('/^[1-4]$/', $user_input)) {
-        return false;
-    }
-
-    return true;
 }
 
 // Add this new function with other utility functions
