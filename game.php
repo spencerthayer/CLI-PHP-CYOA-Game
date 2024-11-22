@@ -197,28 +197,39 @@ function process_scene($scene_data, $api_key) {
     ]);
     
     if ($generate_image_toggle) {
-        $image_prompt = '';
-        if (is_object($scene_data->image)) {
-            $image_prompt = $scene_data->image->prompt;
-        } elseif (is_array($scene_data->image)) {
-            $image_prompt = $scene_data->image['prompt'];
-        } else {
-            $image_prompt = $scene_data->image;
-        }
-
-        if (!is_string($image_prompt)) {
-            if ($debugging) {
-                echo "[DEBUG] Invalid image prompt format: " . print_r($image_prompt, true) . "\n";
-            }
-            return;
-        }
-
-        $scene_data->image = [
-            'prompt' => $image_prompt,
-            'timestamp' => $scene_data->timestamp
-        ];
+        $image_path = __DIR__ . "/images/temp_image_{$scene_data->timestamp}.jpg";
         
-        $ascii_art = process_image_from_text($image_prompt, $scene_data->timestamp);
+        // Check if image already exists
+        if (file_exists($image_path)) {
+            if ($debugging) {
+                echo "[DEBUG] Using existing image for timestamp: {$scene_data->timestamp}\n";
+            }
+            $ascii_art = generate_ascii_art($image_path);
+        } else {
+            // Generate new image if it doesn't exist
+            $image_prompt = '';
+            if (is_object($scene_data->image)) {
+                $image_prompt = $scene_data->image->prompt;
+            } elseif (is_array($scene_data->image)) {
+                $image_prompt = $scene_data->image['prompt'];
+            } else {
+                $image_prompt = $scene_data->image;
+            }
+
+            if (!is_string($image_prompt)) {
+                if ($debugging) {
+                    echo "[DEBUG] Invalid image prompt format: " . print_r($image_prompt, true) . "\n";
+                }
+                return;
+            }
+
+            $scene_data->image = [
+                'prompt' => $image_prompt,
+                'timestamp' => $scene_data->timestamp
+            ];
+            
+            $ascii_art = process_image_from_text($image_prompt, $scene_data->timestamp);
+        }
 
         if (!empty($ascii_art)) {
             echo "\n" . $ascii_art . "\n\n";
@@ -306,15 +317,13 @@ if (!is_dir($images_dir)) {
     mkdir($images_dir, 0755, true);
 }
 
-function removeImageAndDirectory() {
+// Modify the removeImageAndDirectory function to be clearImages
+function clearImages() {
     $directory_path = __DIR__ . '/images';
     if (is_dir($directory_path)) {
         $files = glob($directory_path . '/temp_image_*.jpg');
         foreach ($files as $file) {
             if (is_file($file)) unlink($file);
-        }
-        if (count(scandir($directory_path)) === 2) {
-            rmdir($directory_path);
         }
     }
 }
@@ -442,7 +451,6 @@ while ($current_iteration++ < $max_iterations) {
     // Handle user input
     if (strtolower($user_input) == 'q') {
         echo colorize("\n[bold][yellow]Thank you for playing 'The Quest of the Forgotten Realm'![/yellow][/bold]\n");
-        removeImageAndDirectory();
         break;
     }
 
@@ -450,6 +458,7 @@ while ($current_iteration++ < $max_iterations) {
         echo colorize("\n[bold][yellow]Starting a new game...[/yellow][/bold]\n");
         $conversation = [['role' => 'system', 'content' => $system_prompt]];
         if (file_exists($game_history_file)) unlink($game_history_file);
+        clearImages(); // Only clear images when starting a new game
         $should_make_api_call = true;
         $last_user_input = 'start game';
         continue;
