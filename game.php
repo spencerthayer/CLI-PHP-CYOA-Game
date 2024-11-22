@@ -130,8 +130,8 @@ function generate_image($prompt, $seed) {
         return null;
     }
     
-    $prompt_url = urlencode("8bit ANSI $prompt");
-    $url = "https://image.pollinations.ai/prompt/$prompt_url?model=turbo&nologo=true&width=384&height=192&seed=$seed";
+    $prompt_url = urlencode("8bit ANSI video game $prompt");
+    $url = "https://image.pollinations.ai/prompt/$prompt_url?nologo=true&width=360&height=160&seed=$seed&model=flux-3d";
 
     if ($debugging) {
         echo "[DEBUG] Generated Pollinations URL: $url\n";
@@ -306,8 +306,9 @@ if (file_exists($game_history_file)) {
 } else {
     echo colorize("[bold][green]Starting a new adventure in 'The Quest of the Forgotten Realm'![/green][/bold]\n");
     $conversation[] = ['role' => 'system', 'content' => $system_prompt];
+    $conversation[] = ['role' => 'user', 'content' => 'start game', 'timestamp' => time()];
     $seed = time();
-    $should_make_api_call = true; // Explicitly set for new game
+    $should_make_api_call = true;
 }
 
 // Ensure the images directory exists
@@ -333,13 +334,16 @@ function removeImageAndDirectory() {
 $max_iterations = 1000;
 $current_iteration = 0;
 $should_make_api_call = true;
-$last_user_input = '';
+$last_user_input = 'start game';  // Initialize with 'start game' to trigger first scene
+$user_input = null;
 
 // Modify the initialization section (before the main game loop)
 $user_prefs = load_user_preferences($user_prefs_file);
 $generate_image_toggle = isset($user_prefs['generate_images']) ? $user_prefs['generate_images'] : false;
 
+// Main game loop
 while ($current_iteration++ < $max_iterations) {
+    // Force the first API call without waiting for input
     if ($should_make_api_call && validateApiCall($conversation, $last_user_input)) {
         write_debug_log("Making API call", [
             'conversation_length' => count($conversation),
@@ -432,62 +436,66 @@ while ($current_iteration++ < $max_iterations) {
         }
     }
 
-    echo colorize("\n[cyan]Your choice: [/cyan]");
-    $user_input = trim(fgets(STDIN));
-    $last_user_input = $user_input;  // Store for validation
+    // Only prompt for input after the first scene has been displayed
+    if ($current_iteration > 1) {
+        echo colorize("\n[cyan]Your choice: [/cyan]");
+        $user_input = trim(fgets(STDIN));
+        $last_user_input = $user_input;
 
-    write_debug_log("User input received", [
-        'input' => $user_input,
-        'timestamp' => time()
-    ]);
-    
-    if (strtolower($user_input) == 'q') {
-        echo colorize("\n[bold][yellow]Thank you for playing 'The Quest of the Forgotten Realm'![/yellow][/bold]\n");
-        removeImageAndDirectory();
-        break;
-    }
+        write_debug_log("User input received", [
+            'input' => $user_input,
+            'timestamp' => time()
+        ]);
+        
+        if (strtolower($user_input) == 'q') {
+            echo colorize("\n[bold][yellow]Thank you for playing 'The Quest of the Forgotten Realm'![/yellow][/bold]\n");
+            removeImageAndDirectory();
+            break;
+        }
 
-    if (strtolower($user_input) == 'n') {
-        echo colorize("\n[bold][yellow]Starting a new game...[/yellow][/bold]\n");
-        $conversation = [['role' => 'system', 'content' => $system_prompt]];
-        if (file_exists($game_history_file)) unlink($game_history_file);
-        $should_make_api_call = true;
-        continue;
-    }
-
-    if (strtolower($user_input) == 'g') {
-        $generate_image_toggle = !$generate_image_toggle;
-        $user_prefs['generate_images'] = $generate_image_toggle;
-        save_user_preferences($user_prefs_file, $user_prefs);
-        echo colorize("\n[bold][yellow]Image generation is now " . ($generate_image_toggle ? "On" : "Off") . "[/yellow][/bold]\n");
-        if (isset($scene_data)) process_scene($scene_data, $api_key);
-        continue;
-    }
-
-    if (strtolower($user_input) == 't') {
-        echo colorize("\n[cyan]Type your action: [/cyan]");
-        $custom_action = trim(fgets(STDIN));
-        if (!empty($custom_action)) {
-            $conversation[] = ['role' => 'user', 'content' => $custom_action, 'timestamp' => time()];
+        if (strtolower($user_input) == 'n') {
+            echo colorize("\n[bold][yellow]Starting a new game...[/yellow][/bold]\n");
+            $conversation = [['role' => 'system', 'content' => $system_prompt]];
+            if (file_exists($game_history_file)) unlink($game_history_file);
             $should_make_api_call = true;
-            file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
+            $last_user_input = 'start game';
             continue;
-        } else {
-            echo colorize("[red]No action entered. Please try again.[/red]\n");
+        }
+
+        if (strtolower($user_input) == 'g') {
+            $generate_image_toggle = !$generate_image_toggle;
+            $user_prefs['generate_images'] = $generate_image_toggle;
+            save_user_preferences($user_prefs_file, $user_prefs);
+            echo colorize("\n[bold][yellow]Image generation is now " . ($generate_image_toggle ? "On" : "Off") . "[/yellow][/bold]\n");
+            if (isset($scene_data)) process_scene($scene_data, $api_key);
+            continue;
+        }
+
+        if (strtolower($user_input) == 't') {
+            echo colorize("\n[cyan]Type your action: [/cyan]");
+            $custom_action = trim(fgets(STDIN));
+            if (!empty($custom_action)) {
+                $conversation[] = ['role' => 'user', 'content' => $custom_action, 'timestamp' => time()];
+                $should_make_api_call = true;
+                file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
+                continue;
+            } else {
+                echo colorize("[red]No action entered. Please try again.[/red]\n");
+                if ($scene_data) process_scene($scene_data, $api_key);
+                continue;
+            }
+        }
+
+        if (!preg_match('/^[1-4]$/', $user_input)) {
+            echo colorize("[red]Invalid input. Please enter a number between 1-4, 't' to type an action, 'g' for image, 'q' to quit, or 'n' for new game.[/red]\n");
             if ($scene_data) process_scene($scene_data, $api_key);
             continue;
         }
-    }
 
-    if (!preg_match('/^[1-4]$/', $user_input)) {
-        echo colorize("[red]Invalid input. Please enter a number between 1-4, 't' to type an action, 'g' for image, 'q' to quit, or 'n' for new game.[/red]\n");
-        if ($scene_data) process_scene($scene_data, $api_key);
-        continue;
+        $conversation[] = ['role' => 'user', 'content' => $user_input, 'timestamp' => time()];
+        $should_make_api_call = true;
+        file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
     }
-
-    $conversation[] = ['role' => 'user', 'content' => $user_input, 'timestamp' => time()];
-    $should_make_api_call = true;
-    file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
 }
 
 // Add this new function after other utility functions
@@ -505,6 +513,11 @@ function save_user_preferences($user_prefs_file, $prefs) {
 }
 
 function validateApiCall($conversation, $user_input) {
+    // Allow 'start game' for the initial scene
+    if ($user_input === 'start game') {
+        return true;
+    }
+
     // Don't make API call if there's no user input
     if (empty($user_input)) {
         return false;

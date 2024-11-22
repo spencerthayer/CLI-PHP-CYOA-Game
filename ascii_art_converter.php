@@ -21,12 +21,84 @@ if (!$img) {
     exit(1);
 }
 
-// Get the image dimensions
-list($width, $height) = getimagesize($file);
-
-// ASCII characters are typically taller than they are wide in most fonts
+// Define character aspect ratio
 $char_aspect = 2.5; // Typical terminal character aspect ratio (height/width)
-$scale = 2; // Base scale for sampling
+$scale = 1.5; // Base scale for sampling
+$half_region = 2; // Half of the region size for analysis
+
+// Function to get terminal dimensions
+function get_terminal_size() {
+    $size = [];
+    
+    if (PHP_OS_FAMILY === 'Windows') {
+        // Default size for Windows if unable to detect
+        $size['rows'] = 24;
+        $size['cols'] = 80;
+        
+        // Try to get actual window size using mode CON
+        $output = [];
+        exec('mode CON', $output);
+        foreach ($output as $line) {
+            if (preg_match('/^\s*Lines:\s*(\d+)/', $line, $matches)) {
+                $size['rows'] = (int)$matches[1];
+            }
+            if (preg_match('/^\s*Columns:\s*(\d+)/', $line, $matches)) {
+                $size['cols'] = (int)$matches[1];
+            }
+        }
+    } else {
+        // For Unix-like systems
+        if (preg_match('/^(\d+)\s+(\d+)$/', trim(shell_exec('stty size 2>/dev/null')), $matches)) {
+            $size['rows'] = (int)$matches[1];
+            $size['cols'] = (int)$matches[2];
+        } else {
+            // Default size if unable to detect
+            $size['rows'] = 24;
+            $size['cols'] = 80;
+        }
+    }
+    
+    return $size;
+}
+
+// Get terminal dimensions
+$terminal = get_terminal_size();
+$max_cols = $terminal['cols'] - 2; // Leave small margin
+$max_rows = $terminal['rows'] - 1;
+
+// Get original image dimensions
+list($orig_width, $orig_height) = getimagesize($file);
+
+// Calculate scaling factors
+$width_scale = $max_cols / $orig_width;
+$height_scale = ($max_rows * $char_aspect) / $orig_height;
+$scale_factor = min($width_scale, $height_scale, 1); // Don't scale up
+
+// Calculate new dimensions
+$width = max(1, floor($orig_width * $scale_factor));
+$height = max(1, floor($orig_height * $scale_factor));
+
+// Create resized image if needed
+if ($scale_factor < 1) {
+    $resized = imagecreatetruecolor($width, $height);
+    
+    // Preserve transparency for PNG/GIF
+    $type = exif_imagetype($file);
+    if ($type === IMAGETYPE_PNG || $type === IMAGETYPE_GIF) {
+        imagecolortransparent($resized, imagecolorallocatealpha($resized, 0, 0, 0, 127));
+        imagealphablending($resized, false);
+        imagesavealpha($resized, true);
+    }
+    
+    // Resize with better quality
+    imagecopyresampled($resized, $img, 0, 0, 0, 0, $width, $height, $orig_width, $orig_height);
+    imagedestroy($img);
+    $img = $resized;
+}
+
+// Update step sizes based on new dimensions
+$step_x = max(1, floor($scale * $half_region));
+$step_y = max(1, floor($scale * $char_aspect * $half_region));
 
 // Enhanced Configuration Array
 $config = [
