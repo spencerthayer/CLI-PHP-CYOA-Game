@@ -121,7 +121,7 @@ function generate_image($prompt, $timestamp) {
     }
     
     $prompt_url = urlencode("8bit ANSI video game $prompt");
-    $url = "https://image.pollinations.ai/prompt/$prompt_url?nologo=true&width=360&height=160&seed=$timestamp&model=flux-3d";
+    $url = "https://image.pollinations.ai/prompt/$prompt_url?nologo=true&width=360&height=160&seed=$timestamp&model=flux";
 
     if ($debugging) {
         echo "[DEBUG] Generated Pollinations URL with timestamp: $timestamp\n";
