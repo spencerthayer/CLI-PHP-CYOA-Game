@@ -11,6 +11,7 @@ $debugging = in_array('--debug', $argv);
 $chat_url = 'https://api.openai.com/v1/chat/completions';
 $generate_image_toggle = false;  // Initialize as off by default
 $user_prefs_file = __DIR__ . '/.user_prefs';
+$debug_log_file = __DIR__ . '/.debug_log';
 
 // Function to create a new game by checking for the '--new' flag
 function check_for_new_game($argv, $game_history_file) {
@@ -106,6 +107,29 @@ function stop_loading_animation($pid) {
 // Modify the generate_image function
 function generate_image($prompt, $seed) {
     global $debugging;
+    
+    // Handle if prompt is an array or object
+    if (is_array($prompt) || is_object($prompt)) {
+        if (isset($prompt['prompt'])) {
+            $prompt = $prompt['prompt'];
+        } elseif (isset($prompt->prompt)) {
+            $prompt = $prompt->prompt;
+        } else {
+            if ($debugging) {
+                echo "[DEBUG] Invalid prompt format: " . print_r($prompt, true) . "\n";
+            }
+            return null;
+        }
+    }
+    
+    // Ensure prompt is a string
+    if (!is_string($prompt)) {
+        if ($debugging) {
+            echo "[DEBUG] Prompt is not a string: " . gettype($prompt) . "\n";
+        }
+        return null;
+    }
+    
     $prompt_url = urlencode("8bit ANSI game: $prompt");
     $url = "https://image.pollinations.ai/prompt/$prompt_url?model=flux&nologo=true&width=384&height=192&seed=$seed";
 
@@ -113,12 +137,10 @@ function generate_image($prompt, $seed) {
         echo "[DEBUG] Generated Pollinations URL: $url\n";
     }
     
-    // Start loading animation
     $loading_pid = show_loading_animation();
     
     $image_data = file_get_contents($url);
     
-    // Stop loading animation
     stop_loading_animation($loading_pid);
     
     if ($image_data === false) {
@@ -128,20 +150,40 @@ function generate_image($prompt, $seed) {
     
     $image_path = __DIR__ . "/images/temp_image_$seed.jpg";
     file_put_contents($image_path, $image_data);
-    return generate_ascii_art($image_path); // Convert to ASCII art using the image
+    return generate_ascii_art($image_path);
 }
 
 // Debugging output function
 function debug_log($message) {
-    global $debugging;
-    if ($debugging) {
-        echo "[DEBUG] " . $message . "\n";
-    }
+    write_debug_log($message);
 }
 
-// Function to generate an image from the assistant's text
+// Function to generate an image prompt from the assistant's text
+function generate_image_prompt_summary($text) {
+    // Ensure we're working with a string
+    if (is_array($text)) {
+        if (isset($text['prompt'])) {
+            $text = $text['prompt'];
+        } else {
+            return ""; // Return empty string if no prompt found
+        }
+    }
+    $sentences = explode('.', $text);
+    $prompt = implode('. ', array_slice($sentences, 0, 2));
+    return trim($prompt);
+}
+
+// Function to process image from text
 function process_image_from_text($text, $seed) {
     global $debugging;
+    // Ensure we're working with a string
+    if (is_array($text)) {
+        if (isset($text['prompt'])) {
+            $text = $text['prompt'];
+        } else {
+            return ""; // Return empty string if no prompt found
+        }
+    }
     $prompt = generate_image_prompt_summary($text);
     if ($debugging) {
         echo "[DEBUG] Attempting to generate an image with prompt: '$prompt' and seed: $seed\n";
@@ -150,20 +192,45 @@ function process_image_from_text($text, $seed) {
     return $ascii_art ?: "";
 }
 
-// Function to generate an image prompt from the assistant's text
-function generate_image_prompt_summary($text) {
-    $sentences = explode('.', $text);
-    $prompt = implode('. ', array_slice($sentences, 0, 2));
-    return trim($prompt);
-}
-
 // Function to process the scene and generate image
 function process_scene($scene_data, $api_key) {
     global $debugging, $generate_image_toggle, $seed;
-
+    
+    write_debug_log("Processing new scene", [
+        'generate_image_toggle' => $generate_image_toggle,
+        'seed' => $seed,
+        'scene_data' => $scene_data
+    ]);
+    
     // Generate the image if the toggle is on
     if ($generate_image_toggle) {
-        $image_prompt = $scene_data->image;
+        // Extract the prompt string properly
+        $image_prompt = '';
+        if (is_object($scene_data->image)) {
+            $image_prompt = $scene_data->image->prompt;
+        } elseif (is_array($scene_data->image)) {
+            $image_prompt = $scene_data->image['prompt'];
+        } else {
+            $image_prompt = $scene_data->image;
+        }
+
+        // Ensure we have a string prompt
+        if (!is_string($image_prompt)) {
+            if ($debugging) {
+                echo "[DEBUG] Invalid image prompt format: " . print_r($image_prompt, true) . "\n";
+            }
+            return;
+        }
+
+        $prompt_url = urlencode("8bit ANSI game: $image_prompt");
+        $url = "https://image.pollinations.ai/prompt/$prompt_url?model=flux&nologo=true&width=384&height=192&seed=$seed";
+        
+        // Update scene_data with clean image structure
+        $scene_data->image = [
+            'prompt' => $image_prompt,
+            'url' => $url
+        ];
+        
         $ascii_art = process_image_from_text($image_prompt, $seed);
 
         if (!empty($ascii_art)) {
@@ -277,29 +344,58 @@ $generate_image_toggle = isset($user_prefs['generate_images']) ? $user_prefs['ge
 
 while ($current_iteration++ < $max_iterations) {
     if ($should_make_api_call && validateApiCall($conversation, $last_user_input)) {
+        write_debug_log("Making API call", [
+            'conversation_length' => count($conversation),
+            'last_user_input' => $last_user_input
+        ]);
+        
         $data = [
-            'model' => 'gpt-4o-mini',
+            'model' => 'gpt-4',
             'messages' => $conversation,
             'max_tokens' => 1000,
             'temperature' => 0.8,
-            'response_format' => [
-                "type" => "json_schema",
-                "json_schema" => [
-                    "name" => "game_scene",
-                    "schema" => [
-                        "type" => "object",
-                        "properties" => [
-                            "narrative" => ["type" => "string"],
-                            "options" => ["type" => "array", "items" => ["type" => "string"]],
-                            "image" => ["type" => "string"]
+            'functions' => [
+                [
+                    'name' => 'GameResponse',
+                    'description' => 'Response from the game, containing the narrative, options, and image prompt.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'narrative' => [
+                                'type' => 'string',
+                                'description' => 'The main story text describing the current scene'
+                            ],
+                            'options' => [
+                                'type' => 'array',
+                                'items' => [
+                                    'type' => 'string'
+                                ],
+                                'minItems' => 4,
+                                'maxItems' => 4,
+                                'description' => 'Exactly 4 options for the player to choose from'
+                            ],
+                            'image' => [
+                                'type' => 'object',
+                                'properties' => [
+                                    'prompt' => [
+                                        'type' => 'string',
+                                        'description' => 'A descriptive prompt for generating an 8-bit style image of the current scene'
+                                    ]
+                                ],
+                                'required' => ['prompt'],
+                                'additionalProperties' => false
+                            ]
                         ],
-                        "required" => ["narrative", "options", "image"],
-                        "additionalProperties" => false
+                        'required' => ['narrative', 'options', 'image'],
+                        'additionalProperties' => false
                     ]
                 ]
-            ]
+            ],
+            'function_call' => ['name' => 'GameResponse']
         ];
 
+        write_debug_log("API request payload", $data);
+        
         $ch = curl_init($chat_url);
         curl_setopt_array($ch, [
             CURLOPT_POST => 1,
@@ -311,29 +407,31 @@ while ($current_iteration++ < $max_iterations) {
             ]
         ]);
         $response = curl_exec($ch);
+        write_debug_log("API response received", [
+            'raw_response' => $response,
+            'curl_info' => curl_getinfo($ch)
+        ]);
         if (curl_errno($ch)) {
             echo 'Request Error: ' . curl_error($ch) . "\n";
             break;
         }
         curl_close($ch);
         $result = json_decode($response);
-        if (isset($result->choices[0]->message->content)) {
-            $scene_data = json_decode($result->choices[0]->message->content);
-            if ($scene_data && isset($scene_data->narrative, $scene_data->options, $scene_data->image)) {
-                process_scene($scene_data, $api_key);
-                $conversation[] = [
-                    'role' => 'assistant',
-                    'content' => $result->choices[0]->message->content,
-                    'timestamp' => time()
-                ];
-                file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
-            } else {
-                echo colorize("[red]Error: Received improperly formatted scene data from the assistant.[/red]\n");
-                break;
+        if (isset($result->choices[0]->message->function_call)) {
+            $function_call = $result->choices[0]->message->function_call;
+            if ($function_call->name === 'GameResponse') {
+                $scene_data = json_decode($function_call->arguments);
+                if ($scene_data && isset($scene_data->narrative, $scene_data->options, $scene_data->image)) {
+                    process_scene($scene_data, $api_key);
+                    $conversation[] = [
+                        'role' => 'assistant',
+                        'content' => '',
+                        'function_call' => $function_call,
+                        'timestamp' => time()
+                    ];
+                    file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
+                }
             }
-        } else {
-            echo colorize("[red]Error in API response.\n");
-            break;
         }
     }
 
@@ -341,6 +439,11 @@ while ($current_iteration++ < $max_iterations) {
     $user_input = trim(fgets(STDIN));
     $last_user_input = $user_input;  // Store for validation
 
+    write_debug_log("User input received", [
+        'input' => $user_input,
+        'timestamp' => time()
+    ]);
+    
     if (strtolower($user_input) == 'q') {
         echo colorize("\n[bold][yellow]Thank you for playing 'The Quest of the Forgotten Realm'![/yellow][/bold]\n");
         removeImageAndDirectory();
@@ -423,5 +526,22 @@ function validateApiCall($conversation, $user_input) {
     }
 
     return true;
+}
+
+// Add this new function with other utility functions
+function write_debug_log($message, $context = null) {
+    global $debugging, $debug_log_file;
+    if (!$debugging) return;
+
+    $timestamp = date('Y-m-d H:i:s');
+    $log_message = "[$timestamp] $message";
+    
+    if ($context !== null) {
+        $formatted_context = print_r($context, true);
+        $log_message .= "\nContext: $formatted_context";
+    }
+    
+    file_put_contents($debug_log_file, $log_message . "\n", FILE_APPEND);
+    echo "[DEBUG] $message\n";
 }
 ?>
