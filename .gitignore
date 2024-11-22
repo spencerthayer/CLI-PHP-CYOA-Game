@@ -33,3 +33,5 @@ key.txt
 images/
 
 .debug_log
+
+.DS_Store
