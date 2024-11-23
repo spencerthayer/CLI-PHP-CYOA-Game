@@ -9,7 +9,7 @@ $api_key_file = __DIR__ . '/.openai_api_key';
 $game_history_file = __DIR__ . '/.game_history';
 $debugging = in_array('--debug', $argv);
 $chat_url = 'https://api.openai.com/v1/chat/completions';
-$generate_image_toggle = false;  // Initialize as off by default
+$generate_image_toggle = false;
 $user_prefs_file = __DIR__ . '/.user_prefs';
 $debug_log_file = __DIR__ . '/.debug_log';
 
@@ -258,7 +258,7 @@ function process_scene($scene_data, $api_key) {
     echo "\n"; // Add spacing
     echo colorize("[green](t) Type in your own action[/green]");
     echo " | ";
-    echo colorize("[green](g) Toggle image generation (" . ($generate_image_toggle ? "On" : "Off") . ")[/green]");
+    echo colorize("[green](g) Generate Images (" . ($generate_image_toggle ? "On" : "Off") . ")[/green]");
     echo " | ";
     echo colorize("[green](q) Quit the game[/green]");
     echo " | ";
