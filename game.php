@@ -25,6 +25,10 @@ $should_make_api_call = false;
 $last_user_input = '';
 $scene_data = null;
 
+// Near the top with other constants
+const API_MODEL = 'gpt-4o-mini';
+const MAX_CUSTOM_ACTION_LENGTH = 500;
+
 // Function to create a new game by checking for the '--new' flag
 function check_for_new_game($argv, $game_history_file) {
     if (in_array('--new', $argv)) {
@@ -429,6 +433,11 @@ function validateApiCall($conversation, $user_input) {
         return false;
     }
 
+    // Don't make API calls for special commands
+    if (in_array(strtolower($user_input), ['t', 'g', 'n', 'q'])) {
+        return false;
+    }
+
     // Allow 'start game' for the initial scene
     if ($user_input === 'start game') {
         return true;
@@ -445,110 +454,132 @@ function validateApiCall($conversation, $user_input) {
         return false;
     }
 
-    // Validate user input format
-    if (!in_array(strtolower($user_input), ['t', 'g', 'n', 'q']) && 
-        !preg_match('/^[1-4]$/', $user_input)) {
-        return false;
+    // For custom actions (typed input), allow any non-empty string
+    if ($last_message && $last_message['role'] === 'user' && !empty($last_message['content'])) {
+        return true;
     }
 
-    return true;
+    // Validate numeric input
+    if (preg_match('/^[1-4]$/', $user_input)) {
+        return true;
+    }
+
+    return false;
 }
 
 // Main game loop
 while ($current_iteration++ < $max_iterations) {
     // Only make API call if we have valid input and should make the call
     if ($should_make_api_call && !empty($last_user_input) && validateApiCall($conversation, $last_user_input)) {
-        write_debug_log("Making API call", [
-            'conversation_length' => count($conversation),
-            'last_user_input' => $last_user_input
-        ]);
-        
-        $data = [
-            'model' => 'gpt-4o-mini',
-            'messages' => $conversation,
-            'max_tokens' => 1000,
-            'temperature' => 0.8,
-            'functions' => [
-                [
-                    'name' => 'GameResponse',
-                    'description' => 'Response from the game, containing the narrative, options, and image prompt.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'narrative' => [
-                                'type' => 'string',
-                                'description' => 'The main story text describing the current scene'
-                            ],
-                            'options' => [
-                                'type' => 'array',
-                                'items' => [
-                                    'type' => 'string'
+        try {
+            write_debug_log("Making API call", [
+                'conversation_length' => count($conversation),
+                'last_user_input' => $last_user_input
+            ]);
+            
+            $data = [
+                'model' => API_MODEL,
+                'messages' => $conversation,
+                'max_tokens' => 1000,
+                'temperature' => 0.8,
+                'functions' => [
+                    [
+                        'name' => 'GameResponse',
+                        'description' => 'Response from the game, containing the narrative, options, and image prompt.',
+                        'parameters' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'narrative' => [
+                                    'type' => 'string',
+                                    'description' => 'The main story text describing the current scene'
                                 ],
-                                'minItems' => 4,
-                                'maxItems' => 4,
-                                'description' => 'Exactly 4 options for the player to choose from'
-                            ],
-                            'image' => [
-                                'type' => 'object',
-                                'properties' => [
-                                    'prompt' => [
-                                        'type' => 'string',
-                                        'minCharacters' => 32,
-                                        'maxCharacters' => 128,
-                                        'description' => 'A descriptive prompt for generating an 8-bit style image of the current scene'
-                                    ]
+                                'options' => [
+                                    'type' => 'array',
+                                    'items' => [
+                                        'type' => 'string'
+                                    ],
+                                    'minItems' => 4,
+                                    'maxItems' => 4,
+                                    'description' => 'Exactly 4 options for the player to choose from'
                                 ],
-                                'required' => ['prompt'],
-                                'additionalProperties' => false
-                            ]
-                        ],
-                        'required' => ['narrative', 'options', 'image'],
-                        'additionalProperties' => false
+                                'image' => [
+                                    'type' => 'object',
+                                    'properties' => [
+                                        'prompt' => [
+                                            'type' => 'string',
+                                            'minCharacters' => 32,
+                                            'maxCharacters' => 128,
+                                            'description' => 'A descriptive prompt for generating an 8-bit style image of the current scene'
+                                        ]
+                                    ],
+                                    'required' => ['prompt'],
+                                    'additionalProperties' => false
+                                ]
+                            ],
+                            'required' => ['narrative', 'options', 'image'],
+                            'additionalProperties' => false
+                        ]
                     ]
-                ]
-            ],
-            'function_call' => ['name' => 'GameResponse']
-        ];
+                ],
+                'function_call' => ['name' => 'GameResponse']
+            ];
 
-        write_debug_log("API request payload", $data);
-        
-        $ch = curl_init($chat_url);
-        curl_setopt_array($ch, [
-            CURLOPT_POST => 1,
-            CURLOPT_POSTFIELDS => json_encode($data),
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'Authorization: Bearer ' . $api_key,
-            ]
-        ]);
-        $response = curl_exec($ch);
-        write_debug_log("API response received", [
-            'raw_response' => $response,
-            'curl_info' => curl_getinfo($ch)
-        ]);
-        if (curl_errno($ch)) {
-            echo 'Request Error: ' . curl_error($ch) . "\n";
-            break;
-        }
-        curl_close($ch);
-        $result = json_decode($response);
-        if (isset($result->choices[0]->message->function_call)) {
-            $function_call = $result->choices[0]->message->function_call;
-            if ($function_call->name === 'GameResponse') {
-                $current_timestamp = time();
-                $scene_data = json_decode($function_call->arguments);
-                if ($scene_data && isset($scene_data->narrative, $scene_data->options, $scene_data->image)) {
-                    $scene_data->timestamp = $current_timestamp;
-                    process_scene($scene_data, $api_key);
-                    $conversation[] = [
-                        'role' => 'assistant',
-                        'content' => '',
-                        'function_call' => $function_call,
-                        'timestamp' => $current_timestamp
-                    ];
-                    file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
+            $ch = curl_init($chat_url);
+            if ($ch === false) {
+                throw new Exception("Failed to initialize cURL");
+            }
+
+            curl_setopt_array($ch, [
+                CURLOPT_POST => 1,
+                CURLOPT_POSTFIELDS => json_encode($data),
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $api_key,
+                ]
+            ]);
+
+            $response = curl_exec($ch);
+            if ($response === false) {
+                throw new Exception("API request failed: " . curl_error($ch));
+            }
+
+            $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            if ($http_code !== 200) {
+                throw new Exception("API returned non-200 status code: " . $http_code);
+            }
+
+            curl_close($ch);
+            
+            $result = json_decode($response);
+            if ($result === null) {
+                throw new Exception("Failed to decode API response");
+            }
+
+            if (isset($result->choices[0]->message->function_call)) {
+                $function_call = $result->choices[0]->message->function_call;
+                if ($function_call->name === 'GameResponse') {
+                    $current_timestamp = time();
+                    $scene_data = json_decode($function_call->arguments);
+                    if ($scene_data && isset($scene_data->narrative, $scene_data->options, $scene_data->image)) {
+                        $scene_data->timestamp = $current_timestamp;
+                        process_scene($scene_data, $api_key);
+                        $conversation[] = [
+                            'role' => 'assistant',
+                            'content' => '',
+                            'function_call' => $function_call,
+                            'timestamp' => $current_timestamp
+                        ];
+                        file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
+                    }
                 }
+            }
+
+        } catch (Exception $e) {
+            write_debug_log("API call error: " . $e->getMessage());
+            echo colorize("[red]An error occurred. Please try again.[/red]\n");
+            if ($scene_data) {
+                process_scene($scene_data, $api_key);
             }
         }
     }
@@ -561,7 +592,7 @@ while ($current_iteration++ < $max_iterations) {
     if (!empty($user_input)) {
         $user_input = strtolower($user_input);
         
-        // Handle different input cases
+        // Handle special commands first
         switch($user_input) {
             case 'q':
                 echo colorize("\n[bold][yellow]Thank you for playing 'The Dying Earth'![/yellow][/bold]\n");
@@ -575,23 +606,7 @@ while ($current_iteration++ < $max_iterations) {
                 if (isset($scene_data)) {
                     process_scene($scene_data, $api_key);
                 }
-                break 2;
-                
-            case 't':
-                echo colorize("\n[cyan]Type your action: [/cyan]");
-                $custom_action = trim(fgets(STDIN));
-                if (!empty($custom_action)) {
-                    $conversation[] = ['role' => 'user', 'content' => $custom_action, 'timestamp' => time()];
-                    $should_make_api_call = true;
-                    $last_user_input = $custom_action;
-                    file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
-                } else {
-                    echo colorize("[red]No action entered. Please try again.[/red]\n");
-                    if ($scene_data) {
-                        process_scene($scene_data, $api_key);
-                    }
-                }
-                break 2;
+                continue 2;
                 
             case 'n':
                 clearImages();
@@ -602,20 +617,56 @@ while ($current_iteration++ < $max_iterations) {
                 }
                 $should_make_api_call = true;
                 $last_user_input = 'start game';
-                break 2;
+                continue 2;
         }
         
-        // Handle numeric input
-        if (preg_match('/^[1-4]$/', $user_input)) {
-            $conversation[] = ['role' => 'user', 'content' => $user_input, 'timestamp' => time()];
-            $should_make_api_call = true;
-            $last_user_input = $user_input;
-            file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
-        } else {
-            echo colorize("[red]Invalid input. Please enter a number between 1-4, 't' to type an action, 'g' for image, 'q' to quit, or 'n' for new game.[/red]\n");
+        // Handle custom action input
+        if ($user_input === 't') {
+            echo colorize("\n[cyan]Type your action: [/cyan]");
+            $custom_action = trim(fgets(STDIN));
+            if (!empty($custom_action)) {
+                if (strlen($custom_action) > MAX_CUSTOM_ACTION_LENGTH) {
+                    echo colorize("[red]Action too long. Please keep it under " . MAX_CUSTOM_ACTION_LENGTH . " characters.[/red]\n");
+                    if ($scene_data) {
+                        process_scene($scene_data, $api_key);
+                    }
+                    continue;
+                }
+                
+                $conversation[] = [
+                    'role' => 'user',
+                    'content' => $custom_action,
+                    'timestamp' => time()
+                ];
+                file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
+                $should_make_api_call = true;
+                $last_user_input = $custom_action;
+                continue;
+            }
+            echo colorize("[red]No action entered. Please try again.[/red]\n");
             if ($scene_data) {
                 process_scene($scene_data, $api_key);
             }
+            continue;
+        }
+        
+        // Handle numeric choices
+        if (preg_match('/^[1-4]$/', $user_input)) {
+            $conversation[] = [
+                'role' => 'user',
+                'content' => $user_input,
+                'timestamp' => time()
+            ];
+            file_put_contents($game_history_file, json_encode($conversation), LOCK_EX);
+            $should_make_api_call = true;
+            $last_user_input = $user_input;
+            continue;
+        }
+        
+        // Invalid input
+        echo colorize("[red]Invalid input. Please enter a number between 1-4, 't' to type an action, 'g' for image, 'q' to quit, or 'n' for new game.[/red]\n");
+        if ($scene_data) {
+            process_scene($scene_data, $api_key);
         }
     }
 }
@@ -639,8 +690,8 @@ function write_debug_log($message, $context = null) {
     global $debugging, $debug_log_file;
     if (!$debugging) return;
 
-    $timestamp = date('Y-m-d H:i:s');
-    $log_message = "[$timestamp] $message";
+    $debug_timestamp = date('Y-m-d H:i:s.u');
+    $log_message = "[$debug_timestamp] $message";
     
     if ($context !== null) {
         $formatted_context = print_r($context, true);
