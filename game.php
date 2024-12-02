@@ -33,7 +33,7 @@ use App\ApiHandler;
 use App\Utils;
 
 // Check if debug mode is enabled
-$debugging = in_array('--debug', $argv);
+$debug = in_array('--debug', $argv);
 
 // Function to get the API key
 function get_api_key($api_key_file) {
@@ -52,8 +52,8 @@ function get_api_key($api_key_file) {
 
 // Function to write to debug log
 function write_debug_log($message, $context = null) {
-    global $debugging, $config;
-    if (!$debugging) return;
+    global $debug, $config;
+    if (!$debug) return;
 
     $debug_timestamp = date('Y-m-d H:i:s.u');
     $log_message = "[$debug_timestamp] $message";
@@ -82,7 +82,7 @@ if (!is_dir($config['paths']['images_dir'])) {
 
 // Initialize components
 $gameState = new GameState($config);
-$imageHandler = new ImageHandler($config, $debugging);
+$imageHandler = new ImageHandler($config, $debug);
 $apiHandler = new ApiHandler($config, get_api_key($config['paths']['api_key_file']));
 
 // Initialize game variables
@@ -420,6 +420,16 @@ while (true) {
         
         // Make API call if needed
         if ($should_make_api_call) {
+            // Get current timestamp for this instance
+            $current_timestamp = time();
+            if ($debug) {
+                echo "[DEBUG] New history instance timestamp: $current_timestamp\n";
+            }
+            write_debug_log("New history instance", ['timestamp' => $current_timestamp]);
+            
+            if ($debug) {
+                echo "[DEBUG] Making API call\n";
+            }
             write_debug_log("Making API call", [
                 'last_user_input' => $last_user_input,
                 'conversation_count' => count($gameState->getConversation())
@@ -434,12 +444,11 @@ while (true) {
                 if (isset($message->function_call->arguments)) {
                     $scene_data = json_decode($message->function_call->arguments);
                     if ($scene_data) {
-                        // Add timestamp if not present
-                        if (!isset($scene_data->timestamp)) {
-                            $scene_data->timestamp = time();
-                            $message->function_call->arguments = json_encode($scene_data);
-                            $gameState->addMessage('assistant', '', $message->function_call);
-                        }
+                        // Always use the current timestamp
+                        $scene_data->timestamp = $current_timestamp;
+                        $message->function_call->arguments = json_encode($scene_data);
+                        $gameState->addMessage('assistant', '', $message->function_call);
+                        
                         displayScene($scene_data, $generate_image_toggle, $imageHandler);
                     } else {
                         write_debug_log("Failed to parse scene data", [

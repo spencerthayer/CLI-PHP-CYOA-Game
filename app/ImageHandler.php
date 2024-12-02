@@ -12,10 +12,10 @@ class ImageHandler {
     }
     
     public function generateImage($prompt, $timestamp) {
+        write_debug_log("Generating new image", ['prompt' => $prompt, 'timestamp' => $timestamp]);
+        
         if (!is_string($prompt)) {
-            if ($this->debug) {
-                echo "[DEBUG] Invalid prompt format: " . print_r($prompt, true) . "\n";
-            }
+            write_debug_log("Invalid prompt format", ['prompt' => print_r($prompt, true)]);
             return null;
         }
         
@@ -25,19 +25,23 @@ class ImageHandler {
         
         // Check if images directory exists and is writable
         if (!is_dir($this->config['paths']['images_dir'])) {
+            write_debug_log("Creating images directory", ['path' => $this->config['paths']['images_dir']]);
             if (!mkdir($this->config['paths']['images_dir'], 0755, true)) {
+                write_debug_log("Error: Could not create images directory");
                 echo "Error: Could not create images directory.\n";
                 return null;
             }
         }
         
         if (!is_writable($this->config['paths']['images_dir'])) {
+            write_debug_log("Error: Images directory is not writable");
             echo "Error: Images directory is not writable.\n";
             return null;
         }
         
         $prompt_url = urlencode("8bit ANSI video game $prompt");
         $url = "https://image.pollinations.ai/prompt/$prompt_url?nologo=true&width=360&height=160&seed=$timestamp&model=flux";
+        write_debug_log("Requesting image from URL", ['url' => $url]);
         
         if ($this->debug) {
             echo "[DEBUG] Requesting image from URL: $url\n";
@@ -49,22 +53,33 @@ class ImageHandler {
         
         if ($image_data === false) {
             $error = error_get_last();
+            write_debug_log("Failed to fetch image", ['error' => $error['message'] ?? 'Unknown error']);
             echo "Error downloading image from Pollinations.ai: " . ($error['message'] ?? 'Unknown error') . "\n";
             return null;
         }
         
         $image_path = $this->config['paths']['images_dir'] . "/temp_image_$timestamp.jpg";
+        write_debug_log("Saving image", ['path' => $image_path]);
+        
         if (!@file_put_contents($image_path, $image_data)) {
+            write_debug_log("Failed to save image");
             echo "Error saving image to: $image_path\n";
             return null;
         }
         
+        write_debug_log("Image saved successfully", ['path' => $image_path]);
         if ($this->debug) {
             echo "[DEBUG] Image saved to: $image_path\n";
         }
         
         $ascii_art = $this->generateAsciiArt($image_path);
-        return $ascii_art !== false ? $ascii_art : null;
+        if ($ascii_art) {
+            write_debug_log("Successfully generated ASCII art");
+            return $ascii_art;
+        } else {
+            write_debug_log("Failed to generate ASCII art");
+            return null;
+        }
     }
     
     public function generateTitleScreen() {
@@ -109,31 +124,39 @@ class ImageHandler {
     }
     
     public function displayExistingImage($timestamp) {
+        write_debug_log("Checking for existing image", ['timestamp' => $timestamp]);
+        
         if ($this->debug) {
             echo "[DEBUG] Checking for existing image with timestamp: $timestamp\n";
         }
         
         $image_path = $this->config['paths']['images_dir'] . "/temp_image_$timestamp.jpg";
+        write_debug_log("Looking for image", ['path' => $image_path]);
+        
         if ($this->debug) {
             echo "[DEBUG] Looking for image at path: $image_path\n";
         }
         
         if (file_exists($image_path)) {
+            write_debug_log("Found existing image", ['path' => $image_path]);
             if ($this->debug) {
                 echo "[DEBUG] Found existing image at: $image_path\n";
             }
             $ascii_art = $this->generateAsciiArt($image_path);
             if ($ascii_art) {
+                write_debug_log("Successfully converted image to ASCII art");
                 if ($this->debug) {
                     echo "[DEBUG] Successfully converted image to ASCII art\n";
                 }
                 return $ascii_art;
             } else {
+                write_debug_log("Failed to convert image to ASCII art");
                 if ($this->debug) {
                     echo "[DEBUG] Failed to convert image to ASCII art\n";
                 }
             }
         } else {
+            write_debug_log("No existing image found", ['path' => $image_path]);
             if ($this->debug) {
                 echo "[DEBUG] No existing image found at: $image_path\n";
             }
@@ -142,9 +165,15 @@ class ImageHandler {
     }
     
     public function clearImages() {
+        write_debug_log("Clearing temporary images");
         $files = glob($this->config['paths']['images_dir'] . '/temp_image_*.jpg');
+        write_debug_log("Found temporary images", ['count' => count($files)]);
+        
         foreach ($files as $file) {
-            if (is_file($file)) unlink($file);
+            if (is_file($file)) {
+                write_debug_log("Deleting temporary image", ['file' => $file]);
+                unlink($file);
+            }
         }
     }
 } 
