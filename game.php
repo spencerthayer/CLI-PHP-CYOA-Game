@@ -346,16 +346,32 @@ while (true) {
                 exit(0);
                 
             case 'n':
-                // Clear game history and start new game
-                if (file_exists($config['paths']['game_history_file'])) {
-                    unlink($config['paths']['game_history_file']);
+                // Ask for confirmation before starting a new game
+                echo Utils::colorize("\n[yellow]Are you sure you want to start a new game? All current progress will be lost.[/yellow]");
+                echo Utils::colorize("\n[green](y) Yes[/green] | [red](n) No[/red]\n");
+                $confirm = strtolower(trim(readline(Utils::colorize("\n[cyan]Your choice: [/cyan]"))));
+                
+                if ($confirm === 'y') {
+                    // Clear game history and start new game
+                    if (file_exists($config['paths']['game_history_file'])) {
+                        unlink($config['paths']['game_history_file']);
+                    }
+                    echo "Starting a new game...\n";
+                    
+                    // Generate and display the title screen
+                    $title_screen = $imageHandler->generateTitleScreen();
+                    if ($title_screen) {
+                        echo $title_screen . "\n";
+                    }
+                    
+                    $gameState = new GameState($config);
+                    $gameState->addMessage('system', $config['system_prompt']);
+                    $gameState->addMessage('user', 'start game');
+                    $should_make_api_call = true;
+                    $last_user_input = 'start game';
+                } else {
+                    echo Utils::colorize("\n[yellow]Continuing current game...[/yellow]\n");
                 }
-                echo "Starting a new game...\n";
-                $gameState = new GameState($config);
-                $gameState->addMessage('system', $config['system_prompt']);
-                $gameState->addMessage('user', 'start game');
-                $should_make_api_call = true;
-                $last_user_input = 'start game';
                 break;
                 
             case 'g':
