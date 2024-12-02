@@ -78,11 +78,17 @@ $scene_data = null;
 
 // Check for new game flag
 if (in_array('--new', $argv)) {
+    // Clear game history
     if (file_exists($config['paths']['game_history_file'])) {
         unlink($config['paths']['game_history_file']);
         echo "Game history cleared. Starting a new game...\n";
     } else {
         echo "No game history found. Starting a new game...\n";
+    }
+    
+    // Clear debug log
+    if (file_exists($config['paths']['debug_log_file'])) {
+        unlink($config['paths']['debug_log_file']);
     }
     
     // Display title screen
@@ -92,6 +98,7 @@ if (in_array('--new', $argv)) {
     }
     
     $imageHandler->clearImages();
+    $gameState = new GameState($config);
     $gameState->addMessage('system', $config['system_prompt']);
     $gameState->addMessage('user', 'start game');
     $should_make_api_call = true;
@@ -207,6 +214,16 @@ while ($current_iteration++ < $config['game']['max_iterations']) {
                     continue 2;
                     
                 case 'n':
+                    // Clear game history
+                    if (file_exists($config['paths']['game_history_file'])) {
+                        unlink($config['paths']['game_history_file']);
+                    }
+                    
+                    // Clear debug log
+                    if (file_exists($config['paths']['debug_log_file'])) {
+                        unlink($config['paths']['debug_log_file']);
+                    }
+                    
                     // Display title screen
                     $title_art = $imageHandler->generateTitleScreen();
                     if ($title_art) {
