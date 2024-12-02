@@ -1,5 +1,20 @@
 <?php
 
+// Ensure readline is available and initialized
+if (!extension_loaded('readline')) {
+    die("The readline extension is required for this game. Please install it first.\n");
+}
+
+// Initialize readline
+readline_completion_function(function($input) {
+    return []; // No auto-completion for now
+});
+
+// Configure readline to use proper line editing
+if (function_exists('readline_info')) {
+    readline_info('bind-tty-special-chars', true);
+}
+
 // Simple autoloader
 spl_autoload_register(function ($class) {
     // Convert namespace to full file path
@@ -308,9 +323,15 @@ while (true) {
     try {
         displayGameMenu($generate_image_toggle);
         
-        // Get user input
-        echo Utils::colorize("\n[cyan]Your choice: [/cyan]");
-        $user_input = strtolower(trim(readline()));
+        // Get user input using readline
+        $user_input = readline(Utils::colorize("\n[cyan]Your choice: [/cyan]"));
+        readline_add_history($user_input); // Add to history for up/down arrow support
+        
+        // Add a newline after input
+        echo "\n";
+        
+        // Process user input
+        $user_input = strtolower(trim($user_input));
         
         if (empty($user_input)) {
             echo Utils::colorize("\n[red]Please enter a valid choice.[/red]\n");
@@ -347,8 +368,11 @@ while (true) {
                 continue 2;
                 
             case 't':
-                echo Utils::colorize("\n[cyan]Type your action: [/cyan]");
-                $custom_action = trim(readline());
+                $custom_action = readline(Utils::colorize("\n[cyan]Type your action: [/cyan]"));
+                readline_add_history($custom_action); // Add to history
+                echo "\n"; // Add newline after input
+                
+                $custom_action = trim($custom_action);
                 
                 if (!empty($custom_action)) {
                     if (strlen($custom_action) > $config['game']['max_custom_action_length']) {
