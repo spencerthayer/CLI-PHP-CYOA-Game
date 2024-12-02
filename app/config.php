@@ -19,7 +19,7 @@ return [
     'game' => [
         'max_iterations' => 1000,
         'max_custom_action_length' => 500,
-        'generate_image_toggle' => false
+        'generate_image_toggle' => true
     ],
     
     'weights' => [

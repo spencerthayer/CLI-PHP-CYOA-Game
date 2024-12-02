@@ -71,7 +71,7 @@ $imageHandler = new ImageHandler($config, $debugging);
 $apiHandler = new ApiHandler($config, get_api_key($config['paths']['api_key_file']));
 
 // Initialize game variables
-$generate_image_toggle = $config['game']['generate_image_toggle'];
+$generate_image_toggle = $config['game']['generate_image_toggle'] ?? true;
 $should_make_api_call = false;
 $last_user_input = '';
 $scene_data = null;
@@ -150,6 +150,12 @@ while ($current_iteration++ < $config['game']['max_iterations']) {
                 if (isset($message->function_call->arguments)) {
                     $scene_data = json_decode($message->function_call->arguments);
                     if ($scene_data) {
+                        write_debug_log("Scene data structure", [
+                            'has_image' => isset($scene_data->image),
+                            'image_data' => $scene_data->image ?? null,
+                            'generate_image_toggle' => $generate_image_toggle
+                        ]);
+                        
                         // Generate and display image if enabled
                         if ($generate_image_toggle && isset($scene_data->image)) {
                             $ascii_art = $imageHandler->generateImage($scene_data->image->prompt, time());
@@ -247,4 +253,9 @@ while ($current_iteration++ < $config['game']['max_iterations']) {
         echo Utils::colorize("[red]An error occurred. Please try again.[/red]\n");
     }
 }
+write_debug_log("Processing new scene", [
+    'generate_image_toggle' => $generate_image_toggle,
+    'timestamp' => time(),
+    'scene_data' => $scene_data
+]);
 ?>
