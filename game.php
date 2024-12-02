@@ -81,9 +81,14 @@ if (!is_dir($config['paths']['images_dir'])) {
 }
 
 // Initialize components
-$gameState = new GameState($config);
+$gameState = new GameState($config, $debug);
+write_debug_log("GameState initialized", ['config' => $config, 'debug' => $debug]);
+
 $imageHandler = new ImageHandler($config, $debug);
-$apiHandler = new ApiHandler($config, get_api_key($config['paths']['api_key_file']));
+write_debug_log("ImageHandler initialized");
+
+$apiHandler = new ApiHandler($config, get_api_key($config['paths']['api_key_file']), $gameState, $debug);
+write_debug_log("ApiHandler initialized with CharacterStats integration");
 
 // Initialize game variables
 $generate_image_toggle = $config['game']['generate_image_toggle'] ?? true;
@@ -173,43 +178,62 @@ if ($should_make_api_call) {
     write_debug_log("Making initial API call");
     $response = $apiHandler->makeApiCall($gameState->getConversation());
     
-    if ($response && isset($response->choices[0]->message)) {
-        $message = $response->choices[0]->message;
-        $gameState->addMessage('assistant', '', $message->function_call);
-        
-        if (isset($message->function_call->arguments)) {
-            $scene_data = json_decode($message->function_call->arguments);
-            if ($scene_data) {
-                // Generate and display image if enabled
-                if ($generate_image_toggle && isset($scene_data->image)) {
-                    $ascii_art = $imageHandler->generateImage($scene_data->image->prompt, time());
-                    if ($ascii_art) {
-                        echo "\n" . $ascii_art . "\n\n";
-                    }
-                }
-                
-                // Display scene text
-                $narrative = Utils::wrapText($scene_data->narrative);
-                echo "\n" . Utils::colorize($narrative) . "\n\n";
-                echo Utils::colorize("\n[bold]Choose your next action:[/bold]\n");
-                
-                foreach ($scene_data->options as $index => $option) {
-                    $number = $index + 1;
-                    echo Utils::colorize("[cyan]{$number}. {$option}[/cyan]\n");
-                }
-                
-                // Display additional options
-                echo "\n";
-                echo Utils::colorize("[green](t) Type in your own action[/green]");
-                echo " | ";
-                echo Utils::colorize("[green](g) Generate Images (" . ($generate_image_toggle ? "On" : "Off") . ")[/green]");
-                echo " | ";
-                echo Utils::colorize("[green](q) Quit the game[/green]");
-                echo " | ";
-                echo Utils::colorize("[green](n) Start a new game[/green]");
-                echo "\n";
-            }
+    if ($response) {
+        if ($debug) {
+            write_debug_log("API response received", $response);
         }
+        
+        $gameState->addMessage('assistant', '', ['name' => 'GameResponse', 'arguments' => json_encode($response)]);
+        
+        // Convert array to object for compatibility
+        $scene_data = json_decode(json_encode($response));
+        if ($scene_data) {
+            // Add timestamp if not present
+            if (!isset($scene_data->timestamp)) {
+                $scene_data->timestamp = time();
+            }
+            
+            if ($debug) {
+                write_debug_log("Displaying scene", [
+                    'narrative_length' => strlen($scene_data->narrative),
+                    'options_count' => count($scene_data->options),
+                    'has_image' => isset($scene_data->image)
+                ]);
+            }
+            
+            // Generate and display image if enabled
+            if ($generate_image_toggle && isset($scene_data->image)) {
+                $ascii_art = $imageHandler->generateImage($scene_data->image->prompt, $scene_data->timestamp);
+                if ($ascii_art) {
+                    echo "\n" . $ascii_art . "\n\n";
+                }
+            }
+            
+            // Display scene text
+            $narrative = Utils::wrapText($scene_data->narrative);
+            echo "\n" . Utils::colorize($narrative) . "\n\n";
+            echo Utils::colorize("\n[bold]Choose your next action:[/bold]\n");
+            
+            foreach ($scene_data->options as $index => $option) {
+                $number = $index + 1;
+                echo Utils::colorize("[cyan]{$number}. {$option}[/cyan]\n");
+            }
+            
+            // Display additional options
+            echo "\n";
+            echo Utils::colorize("[green](t) Type in your own action[/green]");
+            echo " | ";
+            echo Utils::colorize("[green](g) Generate Images (" . ($generate_image_toggle ? "On" : "Off") . ")[/green]");
+            echo " | ";
+            echo Utils::colorize("[green](q) Quit the game[/green]");
+            echo " | ";
+            echo Utils::colorize("[green](n) Start a new game[/green]");
+            echo "\n";
+        } else {
+            throw new \Exception("Failed to parse scene data");
+        }
+    } else {
+        throw new \Exception("No valid response from API");
     }
     $should_make_api_call = false;
 } else {
@@ -220,7 +244,7 @@ if ($should_make_api_call) {
         if ($scene_data) {
             // Generate and display image if enabled
             if ($generate_image_toggle && isset($scene_data->image)) {
-                $ascii_art = $imageHandler->generateImage($scene_data->image->prompt, time());
+                $ascii_art = $imageHandler->generateImage($scene_data->image->prompt, $scene_data->timestamp);
                 if ($ascii_art) {
                     echo "\n" . $ascii_art . "\n\n";
                 }
@@ -437,34 +461,35 @@ while (true) {
             
             $response = $apiHandler->makeApiCall($gameState->getConversation());
             
-            if ($response && isset($response->choices[0]->message)) {
-                $message = $response->choices[0]->message;
-                $gameState->addMessage('assistant', '', $message->function_call);
+            if ($response) {
+                if ($debug) {
+                    write_debug_log("API response received", $response);
+                }
                 
-                if (isset($message->function_call->arguments)) {
-                    $scene_data = json_decode($message->function_call->arguments);
-                    if ($scene_data) {
-                        // Always use the current timestamp
+                $gameState->addMessage('assistant', '', ['name' => 'GameResponse', 'arguments' => json_encode($response)]);
+                
+                // Convert array to object for compatibility
+                $scene_data = json_decode(json_encode($response));
+                if ($scene_data) {
+                    // Add timestamp if not present
+                    if (!isset($scene_data->timestamp)) {
                         $scene_data->timestamp = $current_timestamp;
-                        $message->function_call->arguments = json_encode($scene_data);
-                        $gameState->addMessage('assistant', '', $message->function_call);
-                        
-                        displayScene($scene_data, $generate_image_toggle, $imageHandler);
-                    } else {
-                        write_debug_log("Failed to parse scene data", [
-                            'function_call_arguments' => $message->function_call->arguments
-                        ]);
-                        echo Utils::colorize("\n[red]Error: Failed to parse scene data. Please try again.[/red]\n");
                     }
+                    
+                    if ($debug) {
+                        write_debug_log("Displaying scene", [
+                            'narrative_length' => strlen($scene_data->narrative),
+                            'options_count' => count($scene_data->options),
+                            'has_image' => isset($scene_data->image)
+                        ]);
+                    }
+                    
+                    displayScene($scene_data, $generate_image_toggle, $imageHandler);
                 } else {
-                    write_debug_log("No function call arguments in response");
-                    echo Utils::colorize("\n[red]Error: Invalid response from API. Please try again.[/red]\n");
+                    throw new \Exception("Failed to parse scene data");
                 }
             } else {
-                write_debug_log("Invalid API response", [
-                    'response' => $response
-                ]);
-                echo Utils::colorize("\n[red]Error: Failed to get response from API. Please try again.[/red]\n");
+                throw new \Exception("No valid response from API");
             }
             $should_make_api_call = false;
         }
