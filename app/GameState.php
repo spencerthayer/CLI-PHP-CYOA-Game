@@ -47,4 +47,25 @@ class GameState {
         $this->conversation[] = $message;
         $this->saveState();
     }
+    
+    public function getLastAssistantResponse() {
+        for ($i = count($this->conversation) - 1; $i >= 0; $i--) {
+            $message = $this->conversation[$i];
+            if ($message['role'] === 'assistant' && isset($message['function_call'])) {
+                $function_call = $message['function_call'];
+                if ($function_call['name'] === 'GameResponse') {
+                    return json_decode($function_call['arguments']);
+                }
+            }
+        }
+        return null;
+    }
+
+    public function getSceneData() {
+        $last_response = $this->getLastAssistantResponse();
+        if ($last_response && isset($last_response->narrative) && isset($last_response->options)) {
+            return $last_response;
+        }
+        return null;
+    }
 } 
