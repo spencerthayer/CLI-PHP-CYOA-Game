@@ -46,9 +46,13 @@ class ApiHandler {
                                     ]
                                 ],
                                 'required' => ['prompt']
+                            ],
+                            'timestamp' => [
+                                'type' => 'integer',
+                                'description' => 'Unix timestamp for the current scene'
                             ]
                         ],
-                        'required' => ['narrative', 'options', 'image']
+                        'required' => ['narrative', 'options', 'image', 'timestamp']
                     ]
                 ]
             ],

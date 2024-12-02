@@ -280,9 +280,23 @@ function displayGameMenu($generate_image_toggle) {
 // Function to display scene
 function displayScene($scene_data, $generate_image_toggle = true, $imageHandler = null) {
     if ($generate_image_toggle && isset($scene_data->image) && $imageHandler) {
-        $ascii_art = $imageHandler->generateImage($scene_data->image->prompt, time());
-        if ($ascii_art) {
-            echo "\n" . $ascii_art . "\n\n";
+        $ascii_art = null;
+        
+        // Try to display existing image first
+        if (isset($scene_data->timestamp)) {
+            $ascii_art = $imageHandler->displayExistingImage($scene_data->timestamp);
+            if ($ascii_art) {
+                echo "\n" . $ascii_art . "\n\n";
+            }
+        }
+        
+        // If no existing image, generate a new one
+        if (!$ascii_art && isset($scene_data->image->prompt)) {
+            $timestamp = $scene_data->timestamp ?? time();
+            $ascii_art = $imageHandler->generateImage($scene_data->image->prompt, $timestamp);
+            if ($ascii_art) {
+                echo "\n" . $ascii_art . "\n\n";
+            }
         }
     }
     
@@ -386,6 +400,12 @@ while (true) {
                 if (isset($message->function_call->arguments)) {
                     $scene_data = json_decode($message->function_call->arguments);
                     if ($scene_data) {
+                        // Add timestamp if not present
+                        if (!isset($scene_data->timestamp)) {
+                            $scene_data->timestamp = time();
+                            $message->function_call->arguments = json_encode($scene_data);
+                            $gameState->addMessage('assistant', '', $message->function_call);
+                        }
                         displayScene($scene_data, $generate_image_toggle, $imageHandler);
                     } else {
                         write_debug_log("Failed to parse scene data", [

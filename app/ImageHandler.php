@@ -63,7 +63,8 @@ class ImageHandler {
             echo "[DEBUG] Image saved to: $image_path\n";
         }
         
-        return $this->generateAsciiArt($image_path);
+        $ascii_art = $this->generateAsciiArt($image_path);
+        return $ascii_art !== false ? $ascii_art : null;
     }
     
     public function generateTitleScreen() {
@@ -91,12 +92,31 @@ class ImageHandler {
     }
     
     public function generateAsciiArt($image_path) {
+        if (!file_exists($image_path)) {
+            if ($this->debug) {
+                echo "[DEBUG] Image file not found: $image_path\n";
+            }
+            return null;
+        }
+
         if ($this->debug) {
             echo "[DEBUG] Generating ASCII art from image at: $image_path\n";
         }
         
         $converter = new AsciiArtConverter($this->config);
-        return $converter->convertImage($image_path);
+        $result = $converter->convertImage($image_path);
+        return $result !== false ? $result : null;
+    }
+    
+    public function displayExistingImage($timestamp) {
+        $image_path = $this->config['paths']['images_dir'] . "/temp_image_$timestamp.jpg";
+        if (file_exists($image_path)) {
+            if ($this->debug) {
+                echo "[DEBUG] Found existing image at: $image_path\n";
+            }
+            return $this->generateAsciiArt($image_path);
+        }
+        return null;
     }
     
     public function clearImages() {
