@@ -214,6 +214,16 @@ while ($current_iteration++ < $config['game']['max_iterations']) {
                     continue 2;
                     
                 case 'n':
+                    // Ask for confirmation before starting new game
+                    echo Utils::colorize("\n[bold][red]WARNING: Starting a new game will erase all game history and cannot be undone.[/red][/bold]\n");
+                    echo "Are you sure you want to start a new game? (y/n): ";
+                    $confirmation = trim(strtolower(readline()));
+                    
+                    if ($confirmation !== 'y') {
+                        echo Utils::colorize("\n[green]New game cancelled.[/green]\n");
+                        continue 2;
+                    }
+                    
                     // Clear game history
                     if (file_exists($config['paths']['game_history_file'])) {
                         unlink($config['paths']['game_history_file']);
@@ -227,7 +237,7 @@ while ($current_iteration++ < $config['game']['max_iterations']) {
                     // Display title screen
                     $title_art = $imageHandler->generateTitleScreen();
                     if ($title_art) {
-                        echo "\n" . $title_art . "\n\n";
+                        echo "\n" . $title_art . "\n";
                     }
                     
                     $imageHandler->clearImages();
