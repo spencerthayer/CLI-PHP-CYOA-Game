@@ -109,12 +109,34 @@ class ImageHandler {
     }
     
     public function displayExistingImage($timestamp) {
+        if ($this->debug) {
+            echo "[DEBUG] Checking for existing image with timestamp: $timestamp\n";
+        }
+        
         $image_path = $this->config['paths']['images_dir'] . "/temp_image_$timestamp.jpg";
+        if ($this->debug) {
+            echo "[DEBUG] Looking for image at path: $image_path\n";
+        }
+        
         if (file_exists($image_path)) {
             if ($this->debug) {
                 echo "[DEBUG] Found existing image at: $image_path\n";
             }
-            return $this->generateAsciiArt($image_path);
+            $ascii_art = $this->generateAsciiArt($image_path);
+            if ($ascii_art) {
+                if ($this->debug) {
+                    echo "[DEBUG] Successfully converted image to ASCII art\n";
+                }
+                return $ascii_art;
+            } else {
+                if ($this->debug) {
+                    echo "[DEBUG] Failed to convert image to ASCII art\n";
+                }
+            }
+        } else {
+            if ($this->debug) {
+                echo "[DEBUG] No existing image found at: $image_path\n";
+            }
         }
         return null;
     }

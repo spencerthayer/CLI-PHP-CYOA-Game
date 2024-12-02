@@ -248,13 +248,7 @@ if (file_exists($config['paths']['game_history_file'])) {
     $scene_data = $gameState->getSceneData();
     if ($scene_data) {
         write_debug_log("Found previous scene data");
-        $narrative = Utils::wrapText($scene_data->narrative);
-        echo "\n" . Utils::colorize($narrative) . "\n\n";
-        echo Utils::colorize("\n[bold]Choose your next action:[/bold]\n");
-        foreach ($scene_data->options as $index => $option) {
-            $number = $index + 1;
-            echo Utils::colorize("[cyan]{$number}. {$option}[/cyan]\n");
-        }
+        displayScene($scene_data, $generate_image_toggle, $imageHandler);
     } else {
         write_debug_log("No valid scene data found, starting fresh");
         $last_user_input = 'start game';
