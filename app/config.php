@@ -13,7 +13,8 @@ return [
         'model' => 'gpt-4o-mini',
         'chat_url' => 'https://api.openai.com/v1/chat/completions',
         'max_tokens' => 1000,
-        'temperature' => 0.8
+        'temperature' => 0.8,
+        'max_image_description_length' => 64
     ],
     
     'game' => [

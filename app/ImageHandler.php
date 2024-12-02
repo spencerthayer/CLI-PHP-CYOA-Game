@@ -19,6 +19,16 @@ class ImageHandler {
             return null;
         }
         
+        // Check prompt length
+        if (strlen($prompt) > $this->config['api']['max_image_description_length']) {
+            write_debug_log("Prompt exceeds maximum length", [
+                'length' => strlen($prompt),
+                'max_length' => $this->config['api']['max_image_description_length']
+            ]);
+            $prompt = substr($prompt, 0, $this->config['api']['max_image_description_length']);
+            write_debug_log("Truncated prompt", ['prompt' => $prompt]);
+        }
+
         if ($this->debug) {
             echo "[DEBUG] Generating image with prompt: $prompt\n";
         }

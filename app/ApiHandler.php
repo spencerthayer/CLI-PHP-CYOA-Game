@@ -42,7 +42,8 @@ class ApiHandler {
                                 'properties' => [
                                     'prompt' => [
                                         'type' => 'string',
-                                        'description' => 'A descriptive prompt for generating an 8-bit style image of the current scene'
+                                        'description' => 'A descriptive prompt for generating an 8-bit style image of the current scene',
+                                        'maxLength' => 64
                                     ]
                                 ],
                                 'required' => ['prompt']
