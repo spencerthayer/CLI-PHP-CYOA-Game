@@ -155,6 +155,18 @@ class GameState {
         return $this->character_stats;
     }
     
+    public function saveCharacterStats($stats) {
+        if ($this->debug) {
+            write_debug_log("Saving character stats", [
+                'old_stats' => $this->character_stats->getStats(),
+                'new_stats' => $stats->getStats()
+            ]);
+        }
+        
+        $this->character_stats = $stats;
+        $this->saveState();
+    }
+    
     public function getLastAssistantResponse() {
         for ($i = count($this->conversation) - 1; $i >= 0; $i--) {
             $message = $this->conversation[$i];

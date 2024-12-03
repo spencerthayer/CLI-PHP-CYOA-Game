@@ -18,61 +18,89 @@ class ApiHandler {
     private function processGameMechanics($narrative) {
         $stats = $this->game_state->getCharacterStats();
         $mechanics_log = [];
-        
-        // Process skill checks [SKILL_CHECK:attribute:difficulty]
+        $mechanics_applied = false;
+
+        // Process attribute modifications [MODIFY_ATTRIBUTE:attribute:amount]
         $narrative = preg_replace_callback(
-            '/\[SKILL_CHECK:(\w+):(\d+)\]/',
-            function($matches) use ($stats, &$mechanics_log) {
+            '/\[MODIFY_ATTRIBUTE:(\w+):([+-]?\d+)\]/',
+            function($matches) use ($stats, &$mechanics_log, &$mechanics_applied) {
                 $attribute = $matches[1];
-                $difficulty = intval($matches[2]);
-                $result = $stats->skillCheck($attribute, $difficulty);
+                $amount = intval($matches[2]);
+                $success = $stats->modifyAttribute($attribute, $amount);
+                $mechanics_applied = true;
                 
                 $mechanics_log[] = [
-                    'type' => 'skill_check',
+                    'type' => 'attribute_modification',
                     'attribute' => $attribute,
-                    'difficulty' => $difficulty,
-                    'roll' => $result['roll'],
-                    'modifier' => $result['modifier'] ?? 0,
-                    'total' => $result['total'],
-                    'success' => $result['success']
+                    'amount' => $amount,
+                    'success' => $success
                 ];
                 
                 return sprintf(
-                    "[%s on %s check (DC %d): %s]",
-                    $result['success'] ? "SUCCESS" : "FAILURE",
-                    $attribute,
-                    $difficulty,
-                    $result['details']
+                    "[%s %+d to %s]",
+                    $amount >= 0 ? "Gained" : "Lost",
+                    abs($amount),
+                    $attribute
                 );
             },
             $narrative
         );
 
-        // Process saving throws [SAVE:type:difficulty]
+        // Process healing [HEAL:amount]
         $narrative = preg_replace_callback(
-            '/\[SAVE:(\w+):(\d+)\]/',
-            function($matches) use ($stats, &$mechanics_log) {
-                $type = $matches[1];
-                $difficulty = intval($matches[2]);
-                $result = $stats->savingThrow($type, $difficulty);
+            '/\[HEAL:(\d+)\]/',
+            function($matches) use ($stats, &$mechanics_log, &$mechanics_applied) {
+                $amount = intval($matches[1]);
+                $healed = $stats->heal($amount);
+                $mechanics_applied = true;
                 
                 $mechanics_log[] = [
-                    'type' => 'saving_throw',
-                    'save_type' => $type,
-                    'difficulty' => $difficulty,
-                    'roll' => $result['roll'],
-                    'modifier' => $result['modifier'] ?? 0,
-                    'total' => $result['total'],
-                    'success' => $result['success']
+                    'type' => 'healing',
+                    'amount_attempted' => $amount,
+                    'amount_healed' => $healed,
+                    'new_hp' => $stats->getCurrentHP()
                 ];
                 
-                return sprintf(
-                    "[%s on %s save (DC %d): %s]",
-                    $result['success'] ? "SUCCESS" : "FAILURE",
-                    $type,
-                    $difficulty,
-                    $result['details']
-                );
+                return sprintf("[Healed for %d HP]", $healed);
+            },
+            $narrative
+        );
+
+        // Process sanity restoration [RESTORE_SANITY:amount]
+        $narrative = preg_replace_callback(
+            '/\[RESTORE_SANITY:(\d+)\]/',
+            function($matches) use ($stats, &$mechanics_log, &$mechanics_applied) {
+                $amount = intval($matches[1]);
+                $restored = $stats->restoreSanity($amount);
+                $mechanics_applied = true;
+                
+                $mechanics_log[] = [
+                    'type' => 'sanity_restoration',
+                    'amount_attempted' => $amount,
+                    'amount_restored' => $restored,
+                    'new_sanity' => $stats->getCurrentSanity()
+                ];
+                
+                return sprintf("[Restored %d Sanity]", $restored);
+            },
+            $narrative
+        );
+
+        // Process experience gain [GAIN_XP:amount]
+        $narrative = preg_replace_callback(
+            '/\[GAIN_XP:(\d+)\]/',
+            function($matches) use ($stats, &$mechanics_log, &$mechanics_applied) {
+                $amount = intval($matches[1]);
+                $success = $stats->gainExperience($amount);
+                $mechanics_applied = true;
+                
+                $mechanics_log[] = [
+                    'type' => 'experience_gain',
+                    'amount' => $amount,
+                    'new_level' => $stats->getLevel()
+                ];
+                
+                return sprintf("[Gained %d XP]", $amount);
             },
             $narrative
         );
@@ -80,9 +108,10 @@ class ApiHandler {
         // Process sanity checks [SANITY_CHECK:difficulty]
         $narrative = preg_replace_callback(
             '/\[SANITY_CHECK:(\d+)\]/',
-            function($matches) use ($stats, &$mechanics_log) {
+            function($matches) use ($stats, &$mechanics_log, &$mechanics_applied) {
                 $difficulty = intval($matches[1]);
                 $result = $stats->sanityCheck($difficulty);
+                $mechanics_applied = true;
                 
                 $mechanics_log[] = [
                     'type' => 'sanity_check',
@@ -106,16 +135,17 @@ class ApiHandler {
             $narrative
         );
 
-        // Process combat attacks [ATTACK:attribute:difficulty]
+        // Process skill checks [SKILL_CHECK:attribute:difficulty]
         $narrative = preg_replace_callback(
-            '/\[ATTACK:(\w+):(\d+)\]/',
-            function($matches) use ($stats, &$mechanics_log) {
+            '/\[SKILL_CHECK:(\w+):(\d+)\]/',
+            function($matches) use ($stats, &$mechanics_log, &$mechanics_applied) {
                 $attribute = $matches[1];
                 $difficulty = intval($matches[2]);
                 $result = $stats->skillCheck($attribute, $difficulty);
+                $mechanics_applied = true;
                 
                 $mechanics_log[] = [
-                    'type' => 'attack',
+                    'type' => 'skill_check',
                     'attribute' => $attribute,
                     'difficulty' => $difficulty,
                     'roll' => $result['roll'],
@@ -125,8 +155,8 @@ class ApiHandler {
                 ];
                 
                 return sprintf(
-                    "[%s on %s attack (DC %d): %s]",
-                    $result['success'] ? "HIT" : "MISS",
+                    "[%s on %s check (DC %d): %s]",
+                    $result['success'] ? "SUCCESS" : "FAILURE",
                     $attribute,
                     $difficulty,
                     $result['details']
@@ -138,10 +168,11 @@ class ApiHandler {
         // Process damage [DAMAGE:amount]
         $narrative = preg_replace_callback(
             '/\[DAMAGE:(\d+)\]/',
-            function($matches) use ($stats, &$mechanics_log) {
+            function($matches) use ($stats, &$mechanics_log, &$mechanics_applied) {
                 $damage = intval($matches[1]);
                 $old_hp = $stats->getCurrentHP();
                 $new_hp = $stats->takeDamage($damage);
+                $mechanics_applied = true;
                 
                 $mechanics_log[] = [
                     'type' => 'damage',
@@ -155,24 +186,23 @@ class ApiHandler {
             $narrative
         );
 
+        // If any mechanics were processed, save the updated state
+        if ($mechanics_applied) {
+            $this->game_state->saveCharacterStats($stats);
+            
+            if ($this->debug) {
+                write_debug_log("Updated character stats after mechanics", [
+                    'mechanics_applied' => $mechanics_log,
+                    'new_stats' => $stats->getStats()
+                ]);
+            }
+        }
+
         if ($this->debug && !empty($mechanics_log)) {
             write_debug_log("Game mechanics processed", [
                 'mechanics_count' => count($mechanics_log),
-                'mechanics_details' => $mechanics_log,
-                'narrative_length_before' => strlen($narrative),
-                'narrative_length_after' => strlen($narrative)
+                'mechanics_details' => $mechanics_log
             ]);
-            
-            // Log the narrative context around each mechanic
-            foreach ($mechanics_log as $mechanic) {
-                $context = $this->extractNarrativeContext($narrative, $mechanic);
-                write_debug_log("Mechanic context", [
-                    'type' => $mechanic['type'],
-                    'before' => $context['before'],
-                    'result' => $context['result'],
-                    'after' => $context['after']
-                ]);
-            }
         }
 
         return $narrative;
@@ -200,6 +230,22 @@ class ApiHandler {
                 break;
             case 'damage':
                 $pattern = sprintf('/(.{0,100})\[Took %d damage[^\]]+\](.{0,100})/s',
+                    $mechanic['amount']);
+                break;
+            case 'attribute_modification':
+                $pattern = sprintf('/(.{0,100})\[Gained \+%d to %s\](.{0,100})/s',
+                    $mechanic['amount'], $mechanic['attribute']);
+                break;
+            case 'healing':
+                $pattern = sprintf('/(.{0,100})\[Healed for %d HP\](.{0,100})/s',
+                    $mechanic['amount_healed']);
+                break;
+            case 'sanity_restoration':
+                $pattern = sprintf('/(.{0,100})\[Restored %d Sanity\](.{0,100})/s',
+                    $mechanic['amount_restored']);
+                break;
+            case 'experience_gain':
+                $pattern = sprintf('/(.{0,100})\[Gained %d XP\](.{0,100})/s',
                     $mechanic['amount']);
                 break;
         }
