@@ -1,3 +1,10 @@
+# Game data files
+.data/
+.openai_api_key
+.game_history
+.user_prefs
+.debug_log
+
 # CakePHP 3
 
 /vendor/*
@@ -26,14 +33,6 @@
 
 key.txt
 
-.openai_api_key
-
-.game_history
-
 images/
 
-.debug_log
-
 .DS_Store
-
-.data/.user_prefs

@@ -2,10 +2,10 @@
 
 return [
     'paths' => [
-        'api_key_file' => __DIR__ . '/../.openai_api_key',
-        'game_history_file' => __DIR__ . '/../.game_history',
-        'user_prefs_file' => __DIR__ . '/../.user_prefs',
-        'debug_log_file' => __DIR__ . '/../.debug_log',
+        'api_key_file' => __DIR__ . '/../.data/.openai_api_key',
+        'game_history_file' => __DIR__ . '/../.data/.game_history',
+        'user_prefs_file' => __DIR__ . '/../.data/.user_prefs',
+        'debug_log_file' => __DIR__ . '/../.data/.debug_log',
         'images_dir' => __DIR__ . '/../images',
     ],
     
