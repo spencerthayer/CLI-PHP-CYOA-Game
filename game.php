@@ -187,164 +187,32 @@ if ($should_make_api_call) {
         
         // Convert array to object for compatibility
         $scene_data = json_decode(json_encode($response));
-        if ($scene_data) {
-            // Add timestamp if not present
-            if (!isset($scene_data->timestamp)) {
-                $scene_data->timestamp = time();
-            }
-            
-            if ($debug) {
-                write_debug_log("Displaying scene", [
-                    'narrative_length' => strlen($scene_data->narrative),
-                    'options_count' => count($scene_data->options),
-                    'has_image' => isset($scene_data->image)
-                ]);
-            }
-            
-            // Generate and display image if enabled
-            if ($generate_image_toggle && isset($scene_data->image)) {
-                $ascii_art = $imageHandler->generateImage($scene_data->image->prompt, $scene_data->timestamp);
-                if ($ascii_art) {
-                    echo "\n" . $ascii_art . "\n\n";
-                }
-            }
-            
-            // Display scene text
-            $narrative = Utils::wrapText($scene_data->narrative);
-            echo "\n" . Utils::colorize($narrative) . "\n\n";
-            echo Utils::colorize("\n[bold]Choose your next action:[/bold]\n");
-            
-            foreach ($scene_data->options as $index => $option) {
-                $number = $index + 1;
-                echo Utils::colorize("[cyan]{$number}. {$option}[/cyan]\n");
-            }
-            
-            // Display additional options
-            echo "\n";
-            echo Utils::colorize("[green](t) Type in your own action[/green]");
-            echo " | ";
-            echo Utils::colorize("[green](g) Generate Images (" . ($generate_image_toggle ? "On" : "Off") . ")[/green]");
-            echo " | ";
-            echo Utils::colorize("[green](q) Quit the game[/green]");
-            echo " | ";
-            echo Utils::colorize("[green](n) Start a new game[/green]");
-            echo "\n";
-        } else {
+        if (!$scene_data) {
             throw new \Exception("Failed to parse scene data");
+        }
+        // Add timestamp if not present
+        if (!isset($scene_data->timestamp)) {
+            $scene_data->timestamp = time();
         }
     } else {
         throw new \Exception("No valid response from API");
     }
     $should_make_api_call = false;
 } else {
-    // Display the last scene if it exists
+    // Get the last scene if it exists
     $lastMessage = end($conversation);
     if (isset($lastMessage['function_call']) && isset($lastMessage['function_call']->arguments)) {
         $scene_data = json_decode($lastMessage['function_call']->arguments);
-        if ($scene_data) {
-            // Generate and display image if enabled
-            if ($generate_image_toggle && isset($scene_data->image)) {
-                $ascii_art = $imageHandler->generateImage($scene_data->image->prompt, $scene_data->timestamp);
-                if ($ascii_art) {
-                    echo "\n" . $ascii_art . "\n\n";
-                }
-            }
-            
-            // Display scene text
-            $narrative = Utils::wrapText($scene_data->narrative);
-            echo "\n" . Utils::colorize($narrative) . "\n\n";
-            echo Utils::colorize("\n[bold]Choose your next action:[/bold]\n");
-            
-            foreach ($scene_data->options as $index => $option) {
-                $number = $index + 1;
-                echo Utils::colorize("[cyan]{$number}. {$option}[/cyan]\n");
-            }
-            
-            // Display additional options
-            echo "\n";
-            echo Utils::colorize("[green](t) Type in your own action[/green]");
-            echo " | ";
-            echo Utils::colorize("[green](g) Generate Images (" . ($generate_image_toggle ? "On" : "Off") . ")[/green]");
-            echo " | ";
-            echo Utils::colorize("[green](q) Quit the game[/green]");
-            echo " | ";
-            echo Utils::colorize("[green](n) Start a new game[/green]");
-            echo "\n";
-        }
-    }
-}
-
-// Initialize game state
-$gameState = new GameState($config);
-
-// Load previous game state if it exists
-if (file_exists($config['paths']['game_history_file'])) {
-    write_debug_log("Loading game history from: " . $config['paths']['game_history_file']);
-    $conversation = $gameState->getConversation();
-    write_debug_log("Conversation loaded", ['conversation_count' => count($conversation)]);
-    
-    // Get the last scene data
-    $scene_data = $gameState->getSceneData();
-    if ($scene_data) {
-        write_debug_log("Found previous scene data");
-        displayScene($scene_data, $generate_image_toggle, $imageHandler);
-    } else {
-        write_debug_log("No valid scene data found, starting fresh");
-        $last_user_input = 'start game';
-        $should_make_api_call = true;
-    }
-} else {
-    write_debug_log("No game history file found at: " . $config['paths']['game_history_file']);
-}
-
-// Function to display the game menu
-function displayGameMenu($generate_image_toggle) {
-    echo "\n";
-    echo Utils::colorize("[green](t) Type in your own action[/green]");
-    echo " | ";
-    echo Utils::colorize("[green](g) Generate Images (" . ($generate_image_toggle ? "On" : "Off") . ")[/green]");
-    echo " | ";
-    echo Utils::colorize("[green](q) Quit the game[/green]");
-    echo " | ";
-    echo Utils::colorize("[green](n) Start a new game[/green]");
-    echo "\n";
-}
-
-// Function to display scene
-function displayScene($scene_data, $generate_image_toggle = true, $imageHandler = null) {
-    if ($generate_image_toggle && isset($scene_data->image) && $imageHandler) {
-        $ascii_art = null;
-        
-        // Try to display existing image first
-        if (isset($scene_data->timestamp)) {
-            $ascii_art = $imageHandler->displayExistingImage($scene_data->timestamp);
-            if ($ascii_art) {
-                echo "\n" . $ascii_art . "\n\n";
-            }
-        }
-        
-        // If no existing image, generate a new one
-        if (!$ascii_art && isset($scene_data->image->prompt)) {
-            $timestamp = $scene_data->timestamp ?? time();
-            $ascii_art = $imageHandler->generateImage($scene_data->image->prompt, $timestamp);
-            if ($ascii_art) {
-                echo "\n" . $ascii_art . "\n\n";
-            }
-        }
-    }
-    
-    $narrative = Utils::wrapText($scene_data->narrative);
-    echo "\n" . Utils::colorize($narrative) . "\n\n";
-    echo Utils::colorize("\n[bold]Choose your next action:[/bold]\n");
-    foreach ($scene_data->options as $index => $option) {
-        $number = $index + 1;
-        echo Utils::colorize("[cyan]{$number}. {$option}[/cyan]\n");
     }
 }
 
 // Main game loop
 while (true) {
     try {
+        // Display the current scene and menu
+        if ($scene_data) {
+            displayScene($scene_data, $generate_image_toggle, $imageHandler);
+        }
         displayGameMenu($generate_image_toggle);
         
         // Get user input using readline
@@ -388,11 +256,12 @@ while (true) {
                         echo $title_screen . "\n";
                     }
                     
-                    $gameState = new GameState($config);
+                    $gameState = new GameState($config, $debug);
                     $gameState->addMessage('system', $config['system_prompt']);
                     $gameState->addMessage('user', 'start game');
                     $should_make_api_call = true;
                     $last_user_input = 'start game';
+                    $scene_data = null; // Reset scene data for new game
                 } else {
                     echo Utils::colorize("\n[yellow]Continuing current game...[/yellow]\n");
                 }
@@ -470,23 +339,12 @@ while (true) {
                 
                 // Convert array to object for compatibility
                 $scene_data = json_decode(json_encode($response));
-                if ($scene_data) {
-                    // Add timestamp if not present
-                    if (!isset($scene_data->timestamp)) {
-                        $scene_data->timestamp = $current_timestamp;
-                    }
-                    
-                    if ($debug) {
-                        write_debug_log("Displaying scene", [
-                            'narrative_length' => strlen($scene_data->narrative),
-                            'options_count' => count($scene_data->options),
-                            'has_image' => isset($scene_data->image)
-                        ]);
-                    }
-                    
-                    displayScene($scene_data, $generate_image_toggle, $imageHandler);
-                } else {
+                if (!$scene_data) {
                     throw new \Exception("Failed to parse scene data");
+                }
+                // Add timestamp if not present
+                if (!isset($scene_data->timestamp)) {
+                    $scene_data->timestamp = $current_timestamp;
                 }
             } else {
                 throw new \Exception("No valid response from API");
@@ -498,6 +356,51 @@ while (true) {
         write_debug_log("Error in game loop: " . $e->getMessage());
         echo Utils::colorize("[red]An error occurred: " . $e->getMessage() . "\nPlease try again.[/red]\n");
         continue;
+    }
+}
+
+// Function to display the game menu
+function displayGameMenu($generate_image_toggle) {
+    echo "\n";
+    echo Utils::colorize("[green](t) Type in your own action[/green]");
+    echo " | ";
+    echo Utils::colorize("[green](g) Generate Images (" . ($generate_image_toggle ? "On" : "Off") . ")[/green]");
+    echo " | ";
+    echo Utils::colorize("[green](q) Quit the game[/green]");
+    echo " | ";
+    echo Utils::colorize("[green](n) Start a new game[/green]");
+    echo "\n";
+}
+
+// Function to display scene
+function displayScene($scene_data, $generate_image_toggle = true, $imageHandler = null) {
+    if ($generate_image_toggle && isset($scene_data->image) && $imageHandler) {
+        $ascii_art = null;
+        
+        // Try to display existing image first
+        if (isset($scene_data->timestamp)) {
+            $ascii_art = $imageHandler->displayExistingImage($scene_data->timestamp);
+            if ($ascii_art) {
+                echo "\n" . $ascii_art . "\n\n";
+            }
+        }
+        
+        // If no existing image, generate a new one
+        if (!$ascii_art && isset($scene_data->image->prompt)) {
+            $timestamp = $scene_data->timestamp ?? time();
+            $ascii_art = $imageHandler->generateImage($scene_data->image->prompt, $timestamp);
+            if ($ascii_art) {
+                echo "\n" . $ascii_art . "\n\n";
+            }
+        }
+    }
+    
+    $narrative = Utils::wrapText($scene_data->narrative);
+    echo "\n" . Utils::colorize($narrative) . "\n\n";
+    echo Utils::colorize("\n[bold]Choose your next action:[/bold]\n");
+    foreach ($scene_data->options as $index => $option) {
+        $number = $index + 1;
+        echo Utils::colorize("[cyan]{$number}. {$option}[/cyan]\n");
     }
 }
 
