@@ -15,10 +15,11 @@ class CharacterStats
         'Faith' => ['current' => 10, 'max' => 10],
         'Luck' => ['current' => 10, 'max' => 10],
         'Endurance' => ['current' => 10, 'max' => 10],
+        'Charisma' => ['current' => 10, 'max' => 10],
         
         // Derived Stats - these will be calculated in initializeStats()
-        'HP' => ['current' => 0, 'max' => 0],
-        'FP' => ['current' => 0, 'max' => 0],
+        'Health' => ['current' => 0, 'max' => 0],
+        'Focus' => ['current' => 0, 'max' => 0],
         'Stamina' => ['current' => 0, 'max' => 0],
         'Sanity' => ['current' => 0, 'max' => 0]
     ];
@@ -29,8 +30,8 @@ class CharacterStats
 
     // Base values for derived stats
     private $baseValues = [
-        'HP' => 20,      // Base HP
-        'FP' => 10,      // Base Focus Points
+        'Health' => 20,      // Base Health
+        'Focus' => 10,      // Base Focus Points
         'Stamina' => 10, // Base Stamina
         'Sanity' => 20   // Base Sanity
     ];
@@ -51,15 +52,15 @@ class CharacterStats
     {
         // Initialize Primary Attributes (already set in $attributes)
         
-        // Initialize HP based on Vitality
+        // Initialize Health based on Vitality
         $vitalityMod = $this->calculateModifier($this->attributes['Vitality']['current']);
-        $this->attributes['HP']['max'] = $this->baseValues['HP'] + ($vitalityMod * $this->level);
-        $this->attributes['HP']['current'] = $this->attributes['HP']['max'];
+        $this->attributes['Health']['max'] = $this->baseValues['Health'] + ($vitalityMod * $this->level);
+        $this->attributes['Health']['current'] = $this->attributes['Health']['max'];
         
-        // Initialize FP based on Willpower
+        // Initialize Focus based on Willpower
         $willpowerMod = $this->calculateModifier($this->attributes['Willpower']['current']);
-        $this->attributes['FP']['max'] = $this->baseValues['FP'] + ($willpowerMod * $this->level);
-        $this->attributes['FP']['current'] = $this->attributes['FP']['max'];
+        $this->attributes['Focus']['max'] = $this->baseValues['Focus'] + ($willpowerMod * $this->level);
+        $this->attributes['Focus']['current'] = $this->attributes['Focus']['max'];
         
         // Initialize Stamina based on Endurance
         $enduranceMod = $this->calculateModifier($this->attributes['Endurance']['current']);
@@ -73,8 +74,8 @@ class CharacterStats
         if ($this->debug) {
             write_debug_log("Stats Initialized", [
                 'derived_stats' => [
-                    'HP' => $this->attributes['HP'],
-                    'FP' => $this->attributes['FP'],
+                    'Health' => $this->attributes['Health'],
+                    'Focus' => $this->attributes['Focus'],
                     'Stamina' => $this->attributes['Stamina'],
                     'Sanity' => $this->attributes['Sanity']
                 ],
@@ -200,6 +201,9 @@ class CharacterStats
             case 'Will':
                 $attribute = 'Willpower';
                 break;
+            case 'Social':
+                $attribute = 'Charisma';
+                break;
             default:
                 throw new \Exception("Invalid saving throw type: $type");
         }
@@ -274,43 +278,43 @@ class CharacterStats
 
     public function takeDamage($amount)
     {
-        $old_hp = $this->attributes['HP']['current'];
-        $this->modifyStat('HP', -$amount);
-        $new_hp = $this->attributes['HP']['current'];
+        $old_health = $this->attributes['Health']['current'];
+        $this->modifyStat('Health', -$amount);
+        $new_health = $this->attributes['Health']['current'];
 
         if ($this->debug) {
             write_debug_log("Taking Damage", [
                 'damage_amount' => $amount,
-                'old_hp' => $old_hp,
-                'new_hp' => $new_hp
+                'old_health' => $old_health,
+                'new_health' => $new_health
             ]);
         }
 
-        return $new_hp;
+        return $new_health;
     }
 
     public function heal($amount)
     {
-        $old_hp = $this->attributes['HP']['current'];
-        $this->modifyStat('HP', $amount);
-        $new_hp = $this->attributes['HP']['current'];
+        $old_health = $this->attributes['Health']['current'];
+        $this->modifyStat('Health', $amount);
+        $new_health = $this->attributes['Health']['current'];
         
         if ($this->debug) {
             write_debug_log("Healing applied", [
-                'old_hp' => $old_hp,
+                'old_health' => $old_health,
                 'amount_healed' => $amount,
-                'new_hp' => $new_hp,
-                'max_hp' => $this->attributes['HP']['max']
+                'new_health' => $new_health,
+                'max_health' => $this->attributes['Health']['max']
             ]);
         }
         
-        return $new_hp - $old_hp; // Return actual amount healed
+        return $new_health - $old_health; // Return actual amount healed
     }
 
-    public function useFP($amount)
+    public function useFocus($amount)
     {
-        if ($this->attributes['FP']['current'] >= $amount) {
-            $this->modifyStat('FP', -$amount);
+        if ($this->attributes['Focus']['current'] >= $amount) {
+            $this->modifyStat('Focus', -$amount);
             return true;
         }
         return false;
@@ -327,7 +331,7 @@ class CharacterStats
 
     public function rest()
     {
-        $stats_to_restore = ['HP', 'FP', 'Stamina'];
+        $stats_to_restore = ['Health', 'Focus', 'Stamina'];
         foreach ($stats_to_restore as $stat) {
             $this->modifyStat($stat, $this->attributes[$stat]['max']);
         }
@@ -359,7 +363,7 @@ class CharacterStats
     {
         // Store current percentages of resources
         $percentages = [];
-        foreach (['HP', 'FP', 'Stamina', 'Sanity'] as $stat) {
+        foreach (['Health', 'Focus', 'Stamina', 'Sanity'] as $stat) {
             $percentages[$stat] = $this->attributes[$stat]['current'] / $this->attributes[$stat]['max'];
         }
 
@@ -368,21 +372,21 @@ class CharacterStats
         $willpowerMod = $this->calculateModifier($this->attributes['Willpower']['current']);
         $enduranceMod = $this->calculateModifier($this->attributes['Endurance']['current']);
 
-        $this->attributes['HP']['max'] = $this->baseValues['HP'] + ($vitalityMod * $this->level);
-        $this->attributes['FP']['max'] = $this->baseValues['FP'] + ($willpowerMod * $this->level);
+        $this->attributes['Health']['max'] = $this->baseValues['Health'] + ($vitalityMod * $this->level);
+        $this->attributes['Focus']['max'] = $this->baseValues['Focus'] + ($willpowerMod * $this->level);
         $this->attributes['Stamina']['max'] = $this->baseValues['Stamina'] + ($enduranceMod * $this->level);
         $this->attributes['Sanity']['max'] = $this->baseValues['Sanity'] + ($willpowerMod * $this->level);
 
         // Restore current values maintaining percentages
-        foreach (['HP', 'FP', 'Stamina', 'Sanity'] as $stat) {
+        foreach (['Health', 'Focus', 'Stamina', 'Sanity'] as $stat) {
             $this->attributes[$stat]['current'] = round($this->attributes[$stat]['max'] * $percentages[$stat]);
         }
 
         if ($this->debug) {
             write_debug_log("Stats Recalculated", [
                 'new_values' => [
-                    'HP' => $this->attributes['HP'],
-                    'FP' => $this->attributes['FP'],
+                    'Health' => $this->attributes['Health'],
+                    'Focus' => $this->attributes['Focus'],
                     'Stamina' => $this->attributes['Stamina'],
                     'Sanity' => $this->attributes['Sanity']
                 ]
@@ -407,7 +411,7 @@ class CharacterStats
     private function onLevelUp()
     {
         // Increase primary attributes
-        $primaryAttributes = ['Strength', 'Dexterity', 'Vitality', 'Intellect', 'Willpower', 'Faith', 'Luck', 'Endurance'];
+        $primaryAttributes = ['Strength', 'Dexterity', 'Vitality', 'Intellect', 'Willpower', 'Faith', 'Luck', 'Endurance', 'Charisma'];
         foreach ($primaryAttributes as $attr) {
             if (rand(1, 100) <= 30) { // 30% chance to increase each attribute
                 $this->attributes[$attr]['max'] += 1;
@@ -419,7 +423,7 @@ class CharacterStats
         $this->recalculateStats();
 
         // Fully restore all resources on level up
-        foreach (['HP', 'FP', 'Stamina', 'Sanity'] as $stat) {
+        foreach (['Health', 'Focus', 'Stamina', 'Sanity'] as $stat) {
             $this->attributes[$stat]['current'] = $this->attributes[$stat]['max'];
         }
 
@@ -428,8 +432,8 @@ class CharacterStats
                 'new_level' => $this->level,
                 'primary_attributes' => array_intersect_key($this->attributes, array_flip($primaryAttributes)),
                 'derived_stats' => [
-                    'HP' => $this->attributes['HP'],
-                    'FP' => $this->attributes['FP'],
+                    'Health' => $this->attributes['Health'],
+                    'Focus' => $this->attributes['Focus'],
                     'Stamina' => $this->attributes['Stamina'],
                     'Sanity' => $this->attributes['Sanity']
                 ]

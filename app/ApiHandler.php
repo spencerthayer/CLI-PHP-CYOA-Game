@@ -29,7 +29,7 @@ class ApiHandler {
                 $difficulty = intval($matches[2]);
                 
                 // Handle different types of checks
-                if (in_array($attribute, ['Strength', 'Dexterity', 'Vitality', 'Intellect', 'Willpower', 'Faith', 'Luck'])) {
+                if (in_array($attribute, ['Strength', 'Dexterity', 'Vitality', 'Intellect', 'Willpower', 'Faith', 'Luck', 'Charisma'])) {
                     $result = $stats->skillCheck($attribute, $difficulty);
                     $roll_text = sprintf(
                         "\n🎲 %s Check: %d + %d (modifier) = %d vs DC %d - %s!\n",
@@ -108,10 +108,10 @@ class ApiHandler {
                     'type' => 'healing',
                     'amount_attempted' => $amount,
                     'amount_healed' => $healed,
-                    'new_hp' => $stats->getCurrentHP()
+                    'new_health' => $stats->getCurrentHealth()
                 ];
                 
-                return sprintf("[Healed for %d HP]", $healed);
+                return sprintf("[Healed for %d Health]", $healed);
             },
             $narrative
         );
@@ -297,18 +297,18 @@ class ApiHandler {
             '/\[DAMAGE:(\d+)\]/',
             function($matches) use ($stats, &$mechanics_log, &$mechanics_applied) {
                 $damage = intval($matches[1]);
-                $old_hp = $stats->getCurrentHP();
-                $new_hp = $stats->takeDamage($damage);
+                $old_health = $stats->getCurrentHealth();
+                $new_health = $stats->takeDamage($damage);
                 $mechanics_applied = true;
                 
                 $mechanics_log[] = [
                     'type' => 'damage',
                     'amount' => $damage,
-                    'old_hp' => $old_hp,
-                    'new_hp' => $new_hp
+                    'old_health' => $old_health,
+                    'new_health' => $new_health
                 ];
                 
-                return sprintf("[Took %d damage. HP remaining: %d]", $damage, $new_hp);
+                return sprintf("[Took %d damage. Health remaining: %d]", $damage, $new_health);
             },
             $narrative
         );
@@ -351,7 +351,7 @@ class ApiHandler {
                     $mechanic['amount'], $mechanic['attribute']);
                 break;
             case 'healing':
-                $pattern = sprintf('/(.{0,100})\[Healed for %d HP\](.{0,100})/s',
+                $pattern = sprintf('/(.{0,100})\[Healed for %d Health\](.{0,100})/s',
                     $mechanic['amount_healed']);
                 break;
             case 'sanity_restoration':
@@ -426,7 +426,7 @@ class ApiHandler {
             $stats = $this->game_state->getCharacterStats();
             
             // Handle different types of checks
-            if (in_array($attribute, ['Strength', 'Dexterity', 'Vitality', 'Intellect', 'Willpower', 'Faith', 'Luck'])) {
+            if (in_array($attribute, ['Strength', 'Dexterity', 'Vitality', 'Intellect', 'Willpower', 'Faith', 'Luck', 'Charisma'])) {
                 $check_result = $stats->skillCheck($attribute, $difficulty);
             } else {
                 $check_result = $stats->savingThrow($attribute, $difficulty);
@@ -453,7 +453,7 @@ class ApiHandler {
                 [
                     [
                         'role' => 'system',
-                        'content' => "You are narrating a dark fantasy RPG game. Provide immersive narrative descriptions but DO NOT include the options list in the narrative - they will be displayed separately. The player's current stats are:\n" .
+                        'content' => "You are narrating a dark fantasy RPG game. Provide immersive narrative descriptions but DO NOT include the options list in the narrative - options will be displayed separately. The player's current stats are:\n" .
                             "Strength: " . $current_stats['attributes']['Strength']['current'] . " (modifier: " . floor(($current_stats['attributes']['Strength']['current'] - 10) / 2) . ")\n" .
                             "Dexterity: " . $current_stats['attributes']['Dexterity']['current'] . " (modifier: " . floor(($current_stats['attributes']['Dexterity']['current'] - 10) / 2) . ")\n" .
                             "Vitality: " . $current_stats['attributes']['Vitality']['current'] . " (modifier: " . floor(($current_stats['attributes']['Vitality']['current'] - 10) / 2) . ")\n" .
@@ -463,8 +463,8 @@ class ApiHandler {
                             "Luck: " . $current_stats['attributes']['Luck']['current'] . " (modifier: " . floor(($current_stats['attributes']['Luck']['current'] - 10) / 2) . ")\n" .
                             "Endurance: " . $current_stats['attributes']['Endurance']['current'] . " (modifier: " . floor(($current_stats['attributes']['Endurance']['current'] - 10) / 2) . ")\n" .
                             "\nDerived Stats:\n" .
-                            "HP: " . $current_stats['attributes']['HP']['current'] . "/" . $current_stats['attributes']['HP']['max'] . "\n" .
-                            "FP: " . $current_stats['attributes']['FP']['current'] . "/" . $current_stats['attributes']['FP']['max'] . "\n" .
+                            "Health: " . $current_stats['attributes']['Health']['current'] . "/" . $current_stats['attributes']['Health']['max'] . "\n" .
+                            "Focus: " . $current_stats['attributes']['Focus']['current'] . "/" . $current_stats['attributes']['Focus']['max'] . "\n" .
                             "Stamina: " . $current_stats['attributes']['Stamina']['current'] . "/" . $current_stats['attributes']['Stamina']['max'] . "\n" .
                             "Sanity: " . $current_stats['attributes']['Sanity']['current'] . "/" . $current_stats['attributes']['Sanity']['max'] . "\n" .
                             "\nLevel: " . $current_stats['level'] . "\n" .
@@ -485,24 +485,13 @@ class ApiHandler {
                                 'description' => 'A rich, atmospheric description of the current scene and its events. Do not include the options list in this field.'
                             ],
                             'options' => [
-                                'type' => 'object',
-                                'description' => 'Available actions for the player. These will be displayed separately from the narrative.',
-                                'properties' => [
-                                    'success' => [
-                                        'type' => 'array',
-                                        'description' => 'List of options to show if the last check was successful',
-                                        'items' => [
-                                            'type' => 'string'
-                                        ]
-                                    ],
-                                    'failure' => [
-                                        'type' => 'array',
-                                        'description' => 'List of options to show if the last check failed',
-                                        'items' => [
-                                            'type' => 'string'
-                                        ]
-                                    ]
-                                ]
+                                'type' => 'array',
+                                'items' => [
+                                    'type' => 'string'
+                                ],
+                                'minItems' => 4,
+                                'maxItems' => 4,
+                                'description' => 'Exactly 4 options for the player to choose from. Each option should be a string that may include an emoji and optional skill check in format [Attribute DC:XX]'
                             ],
                             'image' => [
                                 'type' => 'object',
