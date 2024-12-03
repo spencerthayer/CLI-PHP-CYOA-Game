@@ -22,11 +22,12 @@ class CharacterStats
         'Willpower'  => ['current' => null, 'max' => 20],
         'Wisdom'     => ['current' => null, 'max' => 20],
         
-        // Derived Stats - these will be calculated in initializeStats()
-        'Focus'   => ['current' => 0, 'max' => 0],
+        // Derived Stats
         'Health'  => ['current' => 0, 'max' => 0],
-        'Sanity'  => ['current' => 0, 'max' => 0],
-        'Stamina' => ['current' => 0, 'max' => 0]
+        'Focus'   => ['current' => 0, 'max' => 0],
+        'Stamina' => ['current' => 0, 'max' => 0],
+        'Courage' => ['current' => 0, 'max' => 0],
+        'Sanity'  => ['current' => 0, 'max' => 0]
     ];
 
     private $level = 1;
@@ -35,10 +36,11 @@ class CharacterStats
 
     // Base values for derived stats
     private $baseValues = [
-        'Health' => 20,      // Base Health
-        'Focus' => 10,      // Base Focus Points
-        'Stamina' => 10, // Base Stamina
-        'Sanity' => 20   // Base Sanity
+        'Health'  => 20,  // Base Health
+        'Focus'   => 10,  // Base Focus Points
+        'Stamina' => 10,  // Base Stamina
+        'Courage' => 10,  // Base Courage
+        'Sanity'  => 20   // Base Sanity
     ];
 
     public function __construct($debug = false)
@@ -57,28 +59,39 @@ class CharacterStats
     {
         // Initialize Primary Attributes with random values between 8 and 18
         foreach ($this->attributes as $attribute => $values) {
-            if ($attribute !== 'Health' && $attribute !== 'Focus' && $attribute !== 'Stamina' && $attribute !== 'Sanity') {
+            if (!in_array($attribute, ['Health', 'Focus', 'Stamina', 'Courage', 'Sanity'])) {
                 $this->attributes[$attribute]['current'] = random_int(8, 18);
             }
         }
         
-        // Initialize Health based on Vitality
-        $vitalityMod = $this->calculateModifier($this->attributes['Vitality']['current']);
-        $this->attributes['Health']['max'] = $this->baseValues['Health'] + ($vitalityMod * $this->level);
+        // Calculate Health = (Vitality × 2) + Endurance
+        $vitality = $this->attributes['Vitality']['current'];
+        $endurance = $this->attributes['Endurance']['current'];
+        $this->attributes['Health']['max'] = floor(($vitality * 2) + $endurance);
         $this->attributes['Health']['current'] = $this->attributes['Health']['max'];
         
-        // Initialize Focus based on Willpower
-        $willpowerMod = $this->calculateModifier($this->attributes['Willpower']['current']);
-        $this->attributes['Focus']['max'] = $this->baseValues['Focus'] + ($willpowerMod * $this->level);
+        // Calculate Focus = Willpower + (Intellect + Wisdom)/2
+        $willpower = $this->attributes['Willpower']['current'];
+        $intellect = $this->attributes['Intellect']['current'];
+        $wisdom = $this->attributes['Wisdom']['current'];
+        $this->attributes['Focus']['max'] = floor($willpower + (($intellect + $wisdom) / 2));
         $this->attributes['Focus']['current'] = $this->attributes['Focus']['max'];
         
-        // Initialize Stamina based on Endurance
-        $enduranceMod = $this->calculateModifier($this->attributes['Endurance']['current']);
-        $this->attributes['Stamina']['max'] = $this->baseValues['Stamina'] + ($enduranceMod * $this->level);
+        // Calculate Stamina = (Endurance × 1.5) + (Strength + Agility)/2
+        $strength = $this->attributes['Strength']['current'];
+        $agility = $this->attributes['Agility']['current'];
+        $this->attributes['Stamina']['max'] = floor(($endurance * 1.5) + (($strength + $agility) / 2));
         $this->attributes['Stamina']['current'] = $this->attributes['Stamina']['max'];
 
-        // Initialize Sanity based on Willpower
-        $this->attributes['Sanity']['max'] = $this->baseValues['Sanity'] + ($willpowerMod * $this->level);
+        // Calculate Courage = Willpower + (Spirit + Charisma)/2
+        $spirit = $this->attributes['Spirit']['current'];
+        $charisma = $this->attributes['Charisma']['current'];
+        $this->attributes['Courage']['max'] = floor($willpower + (($spirit + $charisma) / 2));
+        $this->attributes['Courage']['current'] = $this->attributes['Courage']['max'];
+
+        // Calculate Sanity = (Willpower × 1.5) + (Intellect + Perception)/2
+        $perception = $this->attributes['Perception']['current'];
+        $this->attributes['Sanity']['max'] = floor(($willpower * 1.5) + (($intellect + $perception) / 2));
         $this->attributes['Sanity']['current'] = $this->attributes['Sanity']['max'];
 
         if ($this->debug) {
@@ -87,12 +100,8 @@ class CharacterStats
                     'Health' => $this->attributes['Health'],
                     'Focus' => $this->attributes['Focus'],
                     'Stamina' => $this->attributes['Stamina'],
+                    'Courage' => $this->attributes['Courage'],
                     'Sanity' => $this->attributes['Sanity']
-                ],
-                'modifiers' => [
-                    'Vitality' => $vitalityMod,
-                    'Willpower' => $willpowerMod,
-                    'Endurance' => $enduranceMod
                 ]
             ]);
         }
@@ -364,31 +373,47 @@ class CharacterStats
         return 10 + $this->calculateModifier($this->attributes['Dexterity']['current']) + $armorBonus;
     }
 
-    private function calculateModifier($score)
+    public function calculateModifier($score)
     {
-        return floor(($score - 10) / 2);
+        $modifier = floor(($score - 10) / 2);
+        if ($this->debug) {
+            write_debug_log("Calculating modifier", [
+                'score' => $score,
+                'calculation' => "floor(($score - 10) / 2)",
+                'result' => $modifier
+            ]);
+        }
+        return $modifier;
     }
 
     public function recalculateStats()
     {
         // Store current percentages of resources
         $percentages = [];
-        foreach (['Health', 'Focus', 'Stamina', 'Sanity'] as $stat) {
+        foreach (['Health', 'Focus', 'Stamina', 'Courage', 'Sanity'] as $stat) {
             $percentages[$stat] = $this->attributes[$stat]['current'] / $this->attributes[$stat]['max'];
         }
 
         // Recalculate max values
-        $vitalityMod = $this->calculateModifier($this->attributes['Vitality']['current']);
-        $willpowerMod = $this->calculateModifier($this->attributes['Willpower']['current']);
-        $enduranceMod = $this->calculateModifier($this->attributes['Endurance']['current']);
+        $vitality = $this->attributes['Vitality']['current'];
+        $endurance = $this->attributes['Endurance']['current'];
+        $willpower = $this->attributes['Willpower']['current'];
+        $intellect = $this->attributes['Intellect']['current'];
+        $wisdom = $this->attributes['Wisdom']['current'];
+        $strength = $this->attributes['Strength']['current'];
+        $agility = $this->attributes['Agility']['current'];
+        $spirit = $this->attributes['Spirit']['current'];
+        $charisma = $this->attributes['Charisma']['current'];
+        $perception = $this->attributes['Perception']['current'];
 
-        $this->attributes['Health']['max'] = $this->baseValues['Health'] + ($vitalityMod * $this->level);
-        $this->attributes['Focus']['max'] = $this->baseValues['Focus'] + ($willpowerMod * $this->level);
-        $this->attributes['Stamina']['max'] = $this->baseValues['Stamina'] + ($enduranceMod * $this->level);
-        $this->attributes['Sanity']['max'] = $this->baseValues['Sanity'] + ($willpowerMod * $this->level);
+        $this->attributes['Health']['max'] = floor(($vitality * 2) + $endurance);
+        $this->attributes['Focus']['max'] = floor($willpower + (($intellect + $wisdom) / 2));
+        $this->attributes['Stamina']['max'] = floor(($endurance * 1.5) + (($strength + $agility) / 2));
+        $this->attributes['Courage']['max'] = floor($willpower + (($spirit + $charisma) / 2));
+        $this->attributes['Sanity']['max'] = floor(($willpower * 1.5) + (($intellect + $perception) / 2));
 
         // Restore current values maintaining percentages
-        foreach (['Health', 'Focus', 'Stamina', 'Sanity'] as $stat) {
+        foreach (['Health', 'Focus', 'Stamina', 'Courage', 'Sanity'] as $stat) {
             $this->attributes[$stat]['current'] = round($this->attributes[$stat]['max'] * $percentages[$stat]);
         }
 
@@ -398,6 +423,7 @@ class CharacterStats
                     'Health' => $this->attributes['Health'],
                     'Focus' => $this->attributes['Focus'],
                     'Stamina' => $this->attributes['Stamina'],
+                    'Courage' => $this->attributes['Courage'],
                     'Sanity' => $this->attributes['Sanity']
                 ]
             ]);
@@ -433,7 +459,7 @@ class CharacterStats
         $this->recalculateStats();
 
         // Fully restore all resources on level up
-        foreach (['Health', 'Focus', 'Stamina', 'Sanity'] as $stat) {
+        foreach (['Health', 'Focus', 'Stamina', 'Courage', 'Sanity'] as $stat) {
             $this->attributes[$stat]['current'] = $this->attributes[$stat]['max'];
         }
 
@@ -445,6 +471,7 @@ class CharacterStats
                     'Health' => $this->attributes['Health'],
                     'Focus' => $this->attributes['Focus'],
                     'Stamina' => $this->attributes['Stamina'],
+                    'Courage' => $this->attributes['Courage'],
                     'Sanity' => $this->attributes['Sanity']
                 ]
             ]);

@@ -36,7 +36,7 @@ class ApiHandler {
                         $attribute,
                         $result['roll'],
                         $result['modifier'],
-                        $result['total'],
+                        $result['roll'] + $result['modifier'],
                         $difficulty,
                         $result['success'] ? "Success" : "Failure"
                     );
@@ -47,7 +47,7 @@ class ApiHandler {
                         $attribute,
                         $result['roll'],
                         $result['modifier'],
-                        $result['total'],
+                        $result['roll'] + $result['modifier'],
                         $difficulty,
                         $result['success'] ? "Success" : "Failure"
                     );
@@ -190,7 +190,7 @@ class ApiHandler {
                         "\n🎲 Sanity Check: %d + %d (modifier) = %d vs DC %d - Failure! Lost %d Sanity points (Current: %d/%d)\n",
                         $result['roll'],
                         $result['modifier'],
-                        $result['total'],
+                        $result['roll'] + $result['modifier'],
                         $difficulty,
                         $sanity_loss,
                         $new_sanity,
@@ -202,7 +202,7 @@ class ApiHandler {
                     "\n🎲 Sanity Check: %d + %d (modifier) = %d vs DC %d - Success!\n",
                     $result['roll'],
                     $result['modifier'],
-                    $result['total'],
+                    $result['roll'] + $result['modifier'],
                     $difficulty
                 );
             },
@@ -234,7 +234,7 @@ class ApiHandler {
                     $type,
                     $result['roll'],
                     $result['modifier'],
-                    $result['total'],
+                    $result['roll'] + $result['modifier'],
                     $difficulty,
                     $result['success'] ? "Success" : "Failure"
                 );
@@ -268,7 +268,7 @@ class ApiHandler {
                     $result['roll'],
                     $result['modifier'],
                     $result['proficiency'],
-                    $result['total'],
+                    $result['roll'] + $result['modifier'] + $result['proficiency'],
                     $difficulty,
                     $result['success'] ? "Success" : "Failure"
                 );
@@ -285,7 +285,7 @@ class ApiHandler {
                 write_debug_log("🎭 Narrative Branch Decision", [
                     'check_type' => isset($last_check_result['save_type']) ? 'saving_throw' : 'skill_check',
                     'success' => $last_check_result['success'],
-                    'total_roll' => $last_check_result['total'],
+                    'total_roll' => $last_check_result['roll'] + $last_check_result['modifier'],
                     'difficulty' => $last_check_result['difficulty'],
                     'narrative_branch' => $last_check_result['success'] ? 'success_path' : 'failure_path'
                 ]);
@@ -457,12 +457,12 @@ class ApiHandler {
                 $check_result = $stats->skillCheck($attribute, $difficulty);
                 // Display the roll result
                 echo "\n🎲 " . $attribute . " Check: " . $check_result['roll'] . " + " . $check_result['modifier'] . " (modifier) = " . 
-                     $check_result['total'] . " vs DC " . $difficulty . " - " . ($check_result['success'] ? "Success!" : "Failure!") . "\n\n";
+                     $check_result['roll'] + $check_result['modifier'] . " vs DC " . $difficulty . " - " . ($check_result['success'] ? "Success!" : "Failure!") . "\n\n";
             } else {
                 $check_result = $stats->savingThrow($attribute, $difficulty);
                 // Display the roll result
                 echo "\n🎲 " . $attribute . " Save: " . $check_result['roll'] . " + " . $check_result['modifier'] . " (modifier) = " . 
-                     $check_result['total'] . " vs DC " . $difficulty . " - " . ($check_result['success'] ? "Success!" : "Failure!") . "\n\n";
+                     $check_result['roll'] + $check_result['modifier'] . " vs DC " . $difficulty . " - " . ($check_result['success'] ? "Success!" : "Failure!") . "\n\n";
             }
             
             $this->game_state->setLastCheckResult($check_result);
@@ -497,7 +497,7 @@ class ApiHandler {
                         'role' => 'system',
                         'content' => "You are narrating a dark fantasy RPG game. Provide immersive narrative descriptions but DO NOT include the options list in the narrative - options will be displayed separately. Each action choice MUST include a skill check in the format [Attribute DC:difficulty], where difficulty is between " . $this->config['difficulty_range']['min'] . " and " . $this->config['difficulty_range']['max'] . ", representing a range from trivial to nearly impossible challenges. Use emojis to enhance the presentation of choices." . 
                             ($has_skill_check ? "\nLAST SKILL CHECK RESULT: " . $attribute . " Check " . ($check_result['success'] ? "SUCCEEDED" : "FAILED") . 
-                            " (Rolled: " . $check_result['roll'] . " + " . $check_result['modifier'] . " = " . $check_result['total'] . " vs DC " . $difficulty . ")" : "") .
+                            " (Rolled: " . $check_result['roll'] . " + " . $check_result['modifier'] . " = " . $check_result['roll'] + $check_result['modifier'] . " vs DC " . $difficulty . ")" : "") .
                             "\n\nThe player's current stats are:\n" .
                             "Primary Attributes:\n" .
                             $formattedStats .

@@ -508,8 +508,9 @@ function displayCharacterSheet($gameState) {
     foreach ($primaryStats as $stat) {
         if (isset($attributes[$stat])) {
             $current = $attributes[$stat]['current'];
-            $max = $attributes[$stat]['max'];
-            $line = str_pad($stat . ": " . $current . "/" . $max, 36);
+            $modifier = $stats->calculateModifier($current);
+            $modifierStr = ($modifier >= 0) ? "+$modifier" : "$modifier";
+            $line = str_pad($stat . ": " . $current . " (" . $modifierStr . ")", 36);
             echo Utils::colorize($box_left . $line . $box_right);
         }
     }
@@ -519,7 +520,7 @@ function displayCharacterSheet($gameState) {
     echo Utils::colorize($box_left . str_pad("DERIVED STATS", 36) . $box_right);
     echo Utils::colorize($box_sep2);
     
-    $derivedStats = ['Health', 'Focus', 'Stamina', 'Sanity'];
+    $derivedStats = ['Health', 'Focus', 'Stamina', 'Courage', 'Sanity'];
     foreach ($derivedStats as $stat) {
         if (isset($attributes[$stat])) {
             $current = $attributes[$stat]['current'];
