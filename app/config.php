@@ -60,5 +60,31 @@ return [
         Moderate challenges (DC 8-12)
         Difficult challenges (DC 13-16)
         Nearly impossible feats (DC 17-18)
+
+### **Physical Attributes**
+
+- **Strength**: Physical power, determining melee damage output and ability to lift or move heavy objects.
+- **Agility**: Quickness and coordination in movement, affecting dodging and acrobatic maneuvers.
+- **Dexterity**: Fine motor skills and hand-eye coordination, influencing precision tasks like lock-picking and ranged attacks.
+- **Endurance**: Stamina and physical resilience, determining how long you can exert yourself and resist fatigue.
+- **Vitality**: Physical health and resistance, influencing overall hit points, healing rate, and resistance to illnesses or toxins.
+
+### **Mental Attributes**
+
+- **Intellect**: Mental acuity and reasoning ability, affecting problem-solving and learning speed.
+- **Wisdom**: Sound judgment, experience, and decision-making skills, impacting insight, strategic planning, and possibly certain types of magic or abilities.
+- **Knowledge**: Accumulated information and expertise, determining if a character knows specific facts or skills.
+- **Willpower**: Mental fortitude and focus, affecting resistance to mental attacks, ability to concentrate under pressure, and sustain magical abilities.
+- **Perception**: Awareness of surroundings and ability to notice hidden details or dangers, enhancing detection and scouting abilities.
+
+### **Social Attributes**
+
+- **Charisma**: Social influence and persuasion, impacting interactions, negotiations, and leadership roles.
+- **Appearance**: Physical attractiveness, influencing first impressions and certain social interactions.
+
+### **Soul Attributes**
+
+- **Spirit**: Spiritual connection, affecting magical abilities, resistance to spiritual or elemental effects, and interactions with mystical entities.
+- **Luck**: Fortune and discovery, influencing random events, critical successes, and item finds.
 ",
 ]; 

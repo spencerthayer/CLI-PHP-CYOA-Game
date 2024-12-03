@@ -131,7 +131,7 @@ function validateApiCall($conversation, $user_input) {
         return false;
     }
 
-    if (in_array(strtolower($user_input), ['t', 'g', 'n', 'q'])) {
+    if (in_array(strtolower($user_input), ['t', 'g', 'n', 'q', 's'])) {
         return false;
     }
 
@@ -298,13 +298,23 @@ while (true) {
                 }
                 break;
                 
+            case 's':
+                displayCharacterSheet($gameState);
+                continue 2;
+                
             default:
                 // Get the current options based on any recent skill check
                 $current_options = [];
                 if (isset($scene_data->options->success) && isset($scene_data->options->failure)) {
-                    $last_check = $gameState->getLastCheckResult();
-                    if ($last_check) {
-                        $current_options = $last_check['success'] ? $scene_data->options->success : $scene_data->options->failure;
+                    $conversation = $gameState->getConversation();
+                    $last_message = end($conversation);
+                    if ($last_message && $last_message['role'] === 'assistant') {
+                        $last_check = $gameState->getLastCheckResult();
+                        if ($last_check) {
+                            $current_options = $last_check['success'] ? $scene_data->options->success : $scene_data->options->failure;
+                        } else {
+                            $current_options = $scene_data->options->success;
+                        }
                     } else {
                         $current_options = $scene_data->options->success;
                     }
@@ -394,7 +404,7 @@ while (true) {
                     $gameState->addMessage('user', $chosen_option);
                     $should_make_api_call = true;
                 } else {
-                    echo Utils::colorize("\n[red]Invalid choice. Please enter a number between 1-4 or use one of the menu options (t/g/q/n).[/red]\n");
+                    echo Utils::colorize("\n[red]Invalid choice. Please enter a number between 1-4 or use one of the menu options (t/g/q/n/s).[/red]\n");
                     continue 2;
                 }
                 break;
@@ -453,11 +463,73 @@ function displayGameMenu($generate_image_toggle) {
     echo "\n";
     echo Utils::colorize("[green](t) Type in your own action[/green]");
     echo " | ";
+    echo Utils::colorize("[green](s) Character Sheet[/green]");
+    echo " | ";
     echo Utils::colorize("[green](g) Generate Images (" . ($generate_image_toggle ? "On" : "Off") . ")[/green]");
     echo " | ";
     echo Utils::colorize("[green](q) Quit the game[/green]");
     echo " | ";
     echo Utils::colorize("[green](n) Start a new game[/green]");
+    echo "\n";
+}
+
+// Function to display character sheet
+function displayCharacterSheet($gameState) {
+    $stats = $gameState->getCharacterStats();
+    $allStats = $stats->getStats();
+    $attributes = $allStats['attributes'];
+    
+    $box_top    = "[bold][yellow]╔════════════════════════════════════════╗[/yellow][/bold]\n";
+    $box_title  = "[bold][yellow]║           CHARACTER SHEET              ║[/yellow][/bold]\n";
+    $box_sep1   = "[bold][yellow]╠════════════════════════════════════════╣[/yellow][/bold]\n";
+    $box_sep2   = "[bold][yellow]╟────────────────────────────────────────╢[/yellow][/bold]\n";
+    $box_bottom = "[bold][yellow]╚════════════════════════════════════════╝[/yellow][/bold]\n";
+    $box_left   = "[bold][yellow]║[/yellow][/bold] ";
+    $box_right  = " [bold][yellow]  ║[/yellow][/bold]\n";
+    
+    echo "\n";
+    echo Utils::colorize($box_top);
+    echo Utils::colorize($box_title);
+    echo Utils::colorize($box_sep1);
+    
+    // Level and Experience
+    echo Utils::colorize($box_left . str_pad("Level: " . $allStats['level'], 36) . $box_right);
+    echo Utils::colorize($box_left . str_pad("Experience: " . $allStats['experience'], 36) . $box_right);
+    
+    // Primary Attributes Section
+    echo Utils::colorize($box_sep2);
+    echo Utils::colorize($box_left . str_pad("ATTRIBUTES", 36) . $box_right);
+    echo Utils::colorize($box_sep2);
+    
+    $primaryStats = ['Agility', 'Appearance', 'Charisma', 'Dexterity', 'Endurance', 
+                    'Intellect', 'Knowledge', 'Luck', 'Perception', 'Spirit', 
+                    'Strength', 'Vitality', 'Willpower', 'Wisdom'];
+    
+    foreach ($primaryStats as $stat) {
+        if (isset($attributes[$stat])) {
+            $current = $attributes[$stat]['current'];
+            $max = $attributes[$stat]['max'];
+            $line = str_pad($stat . ": " . $current . "/" . $max, 36);
+            echo Utils::colorize($box_left . $line . $box_right);
+        }
+    }
+    
+    // Derived Stats Section
+    echo Utils::colorize($box_sep2);
+    echo Utils::colorize($box_left . str_pad("DERIVED STATS", 36) . $box_right);
+    echo Utils::colorize($box_sep2);
+    
+    $derivedStats = ['Health', 'Focus', 'Stamina', 'Sanity'];
+    foreach ($derivedStats as $stat) {
+        if (isset($attributes[$stat])) {
+            $current = $attributes[$stat]['current'];
+            $max = $attributes[$stat]['max'];
+            $line = str_pad($stat . ": " . $current . "/" . $max, 36);
+            echo Utils::colorize($box_left . $line . $box_right);
+        }
+    }
+    
+    echo Utils::colorize($box_bottom);
     echo "\n";
 }
 
@@ -496,13 +568,19 @@ function displayScene($scene_data, $generate_image_toggle = true, $imageHandler 
     $options = [];
     if (isset($scene_data->options->success) && isset($scene_data->options->failure)) {
         global $gameState;
-        $last_check = $gameState->getLastCheckResult();
-        if ($last_check) {
-            $options = $last_check['success'] ? $scene_data->options->success : $scene_data->options->failure;
-            // Clear the check result after using it
-            $gameState->clearLastCheckResult();
+        $conversation = $gameState->getConversation();
+        $last_message = end($conversation);
+        if ($last_message && $last_message['role'] === 'assistant') {
+            $last_check = $gameState->getLastCheckResult();
+            if ($last_check) {
+                $options = $last_check['success'] ? $scene_data->options->success : $scene_data->options->failure;
+                // Clear the check result after using it
+                $gameState->clearLastCheckResult();
+            } else {
+                // If no check result, use success options as default
+                $options = $scene_data->options->success;
+            }
         } else {
-            // If no check result, use success options as default
             $options = $scene_data->options->success;
         }
     } else if (is_array($scene_data->options)) {
