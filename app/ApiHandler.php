@@ -379,11 +379,35 @@ class ApiHandler {
             $this->game_state->setLastCheckResult($check_result);
         }
 
+        // Get current stats for the system message
+        $current_stats = $this->game_state->getCharacterStats()->getStats();
+        
         $data = [
             'model' => $this->config['api']['model'],
-            'messages' => $conversation,
-            'max_tokens' => $this->config['api']['max_tokens'],
-            'temperature' => $this->config['api']['temperature'],
+            'messages' => array_merge(
+                [
+                    [
+                        'role' => 'system',
+                        'content' => "You are narrating a dark fantasy RPG game. The player's current stats are:\n" .
+                            "Strength: " . $current_stats['attributes']['Strength']['current'] . " (modifier: " . floor(($current_stats['attributes']['Strength']['current'] - 10) / 2) . ")\n" .
+                            "Dexterity: " . $current_stats['attributes']['Dexterity']['current'] . " (modifier: " . floor(($current_stats['attributes']['Dexterity']['current'] - 10) / 2) . ")\n" .
+                            "Vitality: " . $current_stats['attributes']['Vitality']['current'] . " (modifier: " . floor(($current_stats['attributes']['Vitality']['current'] - 10) / 2) . ")\n" .
+                            "Intellect: " . $current_stats['attributes']['Intellect']['current'] . " (modifier: " . floor(($current_stats['attributes']['Intellect']['current'] - 10) / 2) . ")\n" .
+                            "Willpower: " . $current_stats['attributes']['Willpower']['current'] . " (modifier: " . floor(($current_stats['attributes']['Willpower']['current'] - 10) / 2) . ")\n" .
+                            "Faith: " . $current_stats['attributes']['Faith']['current'] . " (modifier: " . floor(($current_stats['attributes']['Faith']['current'] - 10) / 2) . ")\n" .
+                            "Luck: " . $current_stats['attributes']['Luck']['current'] . " (modifier: " . floor(($current_stats['attributes']['Luck']['current'] - 10) / 2) . ")\n" .
+                            "Endurance: " . $current_stats['attributes']['Endurance']['current'] . " (modifier: " . floor(($current_stats['attributes']['Endurance']['current'] - 10) / 2) . ")\n" .
+                            "\nDerived Stats:\n" .
+                            "HP: " . $current_stats['attributes']['HP']['current'] . "/" . $current_stats['attributes']['HP']['max'] . "\n" .
+                            "FP: " . $current_stats['attributes']['FP']['current'] . "/" . $current_stats['attributes']['FP']['max'] . "\n" .
+                            "Stamina: " . $current_stats['attributes']['Stamina']['current'] . "/" . $current_stats['attributes']['Stamina']['max'] . "\n" .
+                            "Sanity: " . $current_stats['attributes']['Sanity']['current'] . "/" . $current_stats['attributes']['Sanity']['max'] . "\n" .
+                            "\nLevel: " . $current_stats['level'] . "\n" .
+                            "Experience: " . $current_stats['experience'] . "\n"
+                    ]
+                ],
+                $conversation
+            ),
             'functions' => [
                 [
                     'name' => 'GameResponse',
