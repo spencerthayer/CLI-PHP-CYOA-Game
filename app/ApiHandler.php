@@ -428,8 +428,14 @@ class ApiHandler {
             // Handle different types of checks
             if (in_array($attribute, ['Agility', 'Appearance', 'Charisma', 'Dexterity', 'Endurance', 'Intellect', 'Knowledge', 'Luck', 'Perception', 'Spirit', 'Strength', 'Vitality', 'Willpower', 'Wisdom'])) {
                 $check_result = $stats->skillCheck($attribute, $difficulty);
+                // Display the roll result
+                echo "\n🎲 " . $attribute . " Check: " . $check_result['roll'] . " + " . $check_result['modifier'] . " (modifier) = " . 
+                     $check_result['total'] . " vs DC " . $difficulty . " - " . ($check_result['success'] ? "Success!" : "Failure!") . "\n\n";
             } else {
                 $check_result = $stats->savingThrow($attribute, $difficulty);
+                // Display the roll result
+                echo "\n🎲 " . $attribute . " Save: " . $check_result['roll'] . " + " . $check_result['modifier'] . " (modifier) = " . 
+                     $check_result['total'] . " vs DC " . $difficulty . " - " . ($check_result['success'] ? "Success!" : "Failure!") . "\n\n";
             }
             
             $this->game_state->setLastCheckResult($check_result);
