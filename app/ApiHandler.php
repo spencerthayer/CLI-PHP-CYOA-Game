@@ -395,19 +395,32 @@ class ApiHandler {
             $function_args['narrative'] = $this->processGameMechanics($function_args['narrative']);
         }
 
+        // Get the last check result
+        $last_check = $this->game_state->getLastCheckResult();
+        if ($last_check) {
+            // If we have branching options based on success/failure
+            if (isset($function_args['options']) && !is_array($function_args['options'])) {
+                if (isset($function_args['options']['success']) && isset($function_args['options']['failure'])) {
+                    // Select the appropriate branch based on the check result
+                    $function_args['options'] = $last_check['success'] ? 
+                        $function_args['options']['success'] : 
+                        $function_args['options']['failure'];
+                }
+            }
+            // Clear the check result after using it
+            $this->game_state->clearLastCheckResult();
+        }
+
         // Handle options format compatibility
         if (isset($function_args['options']) && !is_array($function_args['options'])) {
-            // New format with success/failure branches
-            if (!isset($function_args['options']['success']) || !isset($function_args['options']['failure'])) {
-                // Convert to old format if missing branches
-                $function_args['options'] = array_values((array)$function_args['options']);
-            }
+            $function_args['options'] = array_values((array)$function_args['options']);
         }
         
         if ($this->debug) {
             write_debug_log("Processed narrative with game mechanics", [
                 'narrative_length' => strlen($function_args['narrative']),
-                'options_format' => is_array($function_args['options']) ? 'legacy' : 'branching'
+                'options_format' => is_array($function_args['options']) ? 'legacy' : 'branching',
+                'had_skill_check' => !is_null($last_check)
             ]);
         }
         
@@ -460,7 +473,10 @@ class ApiHandler {
                 [
                     [
                         'role' => 'system',
-                        'content' => "You are narrating a dark fantasy RPG game. Provide immersive narrative descriptions but DO NOT include the options list in the narrative - options will be displayed separately. The player's current stats are:\n" .
+                        'content' => "You are narrating a dark fantasy RPG game. Provide immersive narrative descriptions but DO NOT include the options list in the narrative - options will be displayed separately." . 
+                            ($has_skill_check ? "\nLAST SKILL CHECK RESULT: " . $attribute . " Check " . ($check_result['success'] ? "SUCCEEDED" : "FAILED") . 
+                            " (Rolled: " . $check_result['roll'] . " + " . $check_result['modifier'] . " = " . $check_result['total'] . " vs DC " . $difficulty . ")" : "") .
+                            "\n\nThe player's current stats are:\n" .
                             "Primary Attributes:\n" .
                             "Agility: " . $stats->getStat('Agility')['current'] . " (modifier: " . floor(($stats->getStat('Agility')['current'] - 10) / 2) . ")\n" .
                             "Appearance: " . $stats->getStat('Appearance')['current'] . " (modifier: " . floor(($stats->getStat('Appearance')['current'] - 10) / 2) . ")\n" .
