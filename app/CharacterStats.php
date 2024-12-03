@@ -153,25 +153,41 @@ class CharacterStats
         $total = $roll + $modifier + $proficiencyBonus;
         $success = $total >= $difficulty;
 
-        if ($this->debug) {
-            write_debug_log("Skill Check", [
-                'attribute' => $attribute,
-                'difficulty' => $difficulty,
-                'roll' => $roll,
-                'modifier' => $modifier,
-                'proficiency' => $proficiencyBonus,
-                'total' => $total,
-                'success' => $success
-            ]);
-        }
-
-        return [
+        $result = [
             'success' => $success,
             'roll' => $roll,
             'modifier' => $modifier,
+            'proficiency' => $proficiencyBonus,
             'total' => $total,
-            'details' => "Rolled $roll + $modifier (modifier) + $proficiencyBonus (proficiency) = $total"
+            'difficulty' => $difficulty,
+            'attribute_score' => $this->attributes[$attribute],
+            'details' => sprintf(
+                "Rolled %d + %d (modifier) + %d (proficiency) = %d vs DC %d",
+                $roll, $modifier, $proficiencyBonus, $total, $difficulty
+            )
         ];
+
+        if ($this->debug) {
+            write_debug_log("🎲 Skill Check Result", [
+                'type' => 'skill_check',
+                'attribute' => $attribute,
+                'base_score' => $this->attributes[$attribute],
+                'roll' => [
+                    'die' => 'd20',
+                    'result' => $roll,
+                    'modifier' => $modifier,
+                    'proficiency' => $proficiencyBonus,
+                    'total' => $total
+                ],
+                'difficulty' => $difficulty,
+                'success' => $success,
+                'narrative_impact' => $success ? 
+                    "Character successfully uses their {$attribute} (DC {$difficulty})" :
+                    "Character fails to use their {$attribute} effectively (DC {$difficulty})"
+            ]);
+        }
+
+        return $result;
     }
 
     public function savingThrow($type, $difficulty = 15)
@@ -191,7 +207,47 @@ class CharacterStats
                 throw new \Exception("Invalid saving throw type: $type");
         }
 
-        return $this->skillCheck($attribute, $difficulty);
+        $roll = rand(1, 20);
+        $modifier = $this->calculateModifier($this->attributes[$attribute]);
+        $total = $roll + $modifier;
+        $success = $total >= $difficulty;
+
+        $result = [
+            'success' => $success,
+            'roll' => $roll,
+            'modifier' => $modifier,
+            'total' => $total,
+            'difficulty' => $difficulty,
+            'save_type' => $type,
+            'attribute' => $attribute,
+            'attribute_score' => $this->attributes[$attribute],
+            'details' => sprintf(
+                "Rolled %d + %d (modifier) = %d vs DC %d",
+                $roll, $modifier, $total, $difficulty
+            )
+        ];
+
+        if ($this->debug) {
+            write_debug_log("🎲 Saving Throw Result", [
+                'type' => 'saving_throw',
+                'save_type' => $type,
+                'attribute' => $attribute,
+                'base_score' => $this->attributes[$attribute],
+                'roll' => [
+                    'die' => 'd20',
+                    'result' => $roll,
+                    'modifier' => $modifier,
+                    'total' => $total
+                ],
+                'difficulty' => $difficulty,
+                'success' => $success,
+                'narrative_impact' => $success ? 
+                    "Character successfully resists the {$type} effect (DC {$difficulty})" :
+                    "Character fails to resist the {$type} effect (DC {$difficulty})"
+            ]);
+        }
+
+        return $result;
     }
 
     public function sanityCheck($difficulty = 15)

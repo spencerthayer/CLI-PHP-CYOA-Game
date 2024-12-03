@@ -19,6 +19,7 @@ class ApiHandler {
         $stats = $this->game_state->getCharacterStats();
         $mechanics_log = [];
         $mechanics_applied = false;
+        $last_check_result = null;
 
         // Process attribute modifications [MODIFY_ATTRIBUTE:attribute:amount]
         $narrative = preg_replace_callback(
@@ -135,35 +136,90 @@ class ApiHandler {
             $narrative
         );
 
+        // Process saving throws [SAVE:type:difficulty]
+        $narrative = preg_replace_callback(
+            '/\[SAVE:(\w+):(\d+)\]/',
+            function($matches) use ($stats, &$mechanics_log, &$mechanics_applied, &$last_check_result) {
+                $type = $matches[1];
+                $difficulty = intval($matches[2]);
+                $result = $stats->savingThrow($type, $difficulty);
+                $mechanics_applied = true;
+                $last_check_result = $result;
+                
+                if ($this->debug) {
+                    write_debug_log("🎲 Saving Throw Result", [
+                        'type' => 'saving_throw',
+                        'save_type' => $type,
+                        'roll_result' => $result['details'],
+                        'success' => $result['success']
+                    ]);
+                }
+
+                // Format the roll result for display in the narrative
+                $roll_text = sprintf(
+                    "\n🎲 %s Save: %d + %d (modifier) = %d vs DC %d - %s!\n",
+                    $type,
+                    $result['roll'],
+                    $result['modifier'],
+                    $result['total'],
+                    $difficulty,
+                    $result['success'] ? "Success" : "Failure"
+                );
+                
+                return $roll_text;
+            },
+            $narrative
+        );
+
         // Process skill checks [SKILL_CHECK:attribute:difficulty]
         $narrative = preg_replace_callback(
             '/\[SKILL_CHECK:(\w+):(\d+)\]/',
-            function($matches) use ($stats, &$mechanics_log, &$mechanics_applied) {
+            function($matches) use ($stats, &$mechanics_log, &$mechanics_applied, &$last_check_result) {
                 $attribute = $matches[1];
                 $difficulty = intval($matches[2]);
                 $result = $stats->skillCheck($attribute, $difficulty);
                 $mechanics_applied = true;
+                $last_check_result = $result;
                 
-                $mechanics_log[] = [
-                    'type' => 'skill_check',
-                    'attribute' => $attribute,
-                    'difficulty' => $difficulty,
-                    'roll' => $result['roll'],
-                    'modifier' => $result['modifier'] ?? 0,
-                    'total' => $result['total'],
-                    'success' => $result['success']
-                ];
-                
-                return sprintf(
-                    "[%s on %s check (DC %d): %s]",
-                    $result['success'] ? "SUCCESS" : "FAILURE",
+                if ($this->debug) {
+                    write_debug_log("🎲 Skill Check Result", [
+                        'type' => 'skill_check',
+                        'attribute' => $attribute,
+                        'roll_result' => $result['details'],
+                        'success' => $result['success']
+                    ]);
+                }
+
+                // Format the roll result for display in the narrative
+                $roll_text = sprintf(
+                    "\n🎲 %s Check: %d + %d (modifier) + %d (proficiency) = %d vs DC %d - %s!\n",
                     $attribute,
+                    $result['roll'],
+                    $result['modifier'],
+                    $result['proficiency'],
+                    $result['total'],
                     $difficulty,
-                    $result['details']
+                    $result['success'] ? "Success" : "Failure"
                 );
+                
+                return $roll_text;
             },
             $narrative
         );
+
+        // Store the last check result for narrative branching
+        if ($last_check_result) {
+            $this->game_state->setLastCheckResult($last_check_result);
+            if ($this->debug) {
+                write_debug_log("🎭 Narrative Branch Decision", [
+                    'check_type' => isset($last_check_result['save_type']) ? 'saving_throw' : 'skill_check',
+                    'success' => $last_check_result['success'],
+                    'total_roll' => $last_check_result['total'],
+                    'difficulty' => $last_check_result['difficulty'],
+                    'narrative_branch' => $last_check_result['success'] ? 'success_path' : 'failure_path'
+                ]);
+            }
+        }
 
         // Process damage [DAMAGE:amount]
         $narrative = preg_replace_callback(
@@ -189,20 +245,7 @@ class ApiHandler {
         // If any mechanics were processed, save the updated state
         if ($mechanics_applied) {
             $this->game_state->saveCharacterStats($stats);
-            
-            if ($this->debug) {
-                write_debug_log("Updated character stats after mechanics", [
-                    'mechanics_applied' => $mechanics_log,
-                    'new_stats' => $stats->getStats()
-                ]);
-            }
-        }
-
-        if ($this->debug && !empty($mechanics_log)) {
-            write_debug_log("Game mechanics processed", [
-                'mechanics_count' => count($mechanics_log),
-                'mechanics_details' => $mechanics_log
-            ]);
+            $this->game_state->addToHistory('system', 'mechanics', $mechanics_log);
         }
 
         return $narrative;
@@ -265,7 +308,55 @@ class ApiHandler {
         ];
     }
     
+    private function processApiResponse($response_data) {
+        if (!isset($response_data['choices'][0]['message']['function_call'])) {
+            throw new \Exception("Unexpected API response format");
+        }
+
+        $function_args = json_decode($response_data['choices'][0]['message']['function_call']['arguments'], true);
+        
+        if ($this->debug) {
+            write_debug_log("Parsed function arguments", $function_args);
+        }
+        
+        // Process game mechanics in the narrative
+        if (isset($function_args['narrative'])) {
+            $function_args['narrative'] = $this->processGameMechanics($function_args['narrative']);
+        }
+
+        // Handle options format compatibility
+        if (isset($function_args['options']) && !is_array($function_args['options'])) {
+            // New format with success/failure branches
+            if (!isset($function_args['options']['success']) || !isset($function_args['options']['failure'])) {
+                // Convert to old format if missing branches
+                $function_args['options'] = array_values((array)$function_args['options']);
+            }
+        }
+        
+        if ($this->debug) {
+            write_debug_log("Processed narrative with game mechanics", [
+                'narrative_length' => strlen($function_args['narrative']),
+                'options_format' => is_array($function_args['options']) ? 'legacy' : 'branching'
+            ]);
+        }
+        
+        return $function_args;
+    }
+
     public function makeApiCall($conversation) {
+        // Get the last user message to check for skill check
+        $last_message = end($conversation);
+        $has_skill_check = preg_match('/\[SKILL_CHECK:(\w+):(\d+)\]/', $last_message['content'], $matches);
+        
+        if ($has_skill_check) {
+            // Pre-roll the skill check
+            $attribute = $matches[1];
+            $difficulty = intval($matches[2]);
+            $stats = $this->game_state->getCharacterStats();
+            $check_result = $stats->skillCheck($attribute, $difficulty);
+            $this->game_state->setLastCheckResult($check_result);
+        }
+
         $data = [
             'model' => $this->config['api']['model'],
             'messages' => $conversation,
@@ -313,7 +404,8 @@ class ApiHandler {
         if ($this->debug) {
             write_debug_log("Making API call", [
                 'model' => $data['model'],
-                'conversation_length' => count($conversation)
+                'conversation_length' => count($conversation),
+                'has_skill_check' => $has_skill_check
             ]);
         }
 
@@ -345,30 +437,6 @@ class ApiHandler {
             write_debug_log("Raw API response", $response_data);
         }
 
-        if (isset($response_data['choices'][0]['message']['function_call'])) {
-            $function_args = json_decode($response_data['choices'][0]['message']['function_call']['arguments'], true);
-            
-            if ($this->debug) {
-                write_debug_log("Parsed function arguments", $function_args);
-            }
-            
-            // Process game mechanics in the narrative
-            if (isset($function_args['narrative'])) {
-                $function_args['narrative'] = $this->processGameMechanics($function_args['narrative']);
-            }
-            
-            if ($this->debug) {
-                write_debug_log("Processed narrative with game mechanics", [
-                    'narrative_length' => strlen($function_args['narrative'])
-                ]);
-            }
-            
-            return $function_args;
-        }
-
-        if ($this->debug) {
-            write_debug_log("Unexpected API response format", $response_data);
-        }
-        throw new \Exception("Unexpected API response format");
+        return $this->processApiResponse($response_data);
     }
 } 

@@ -10,6 +10,7 @@ class GameState {
     private $scene_data = null;
     private $character_stats;
     private $debug;
+    private $last_check_result = null;
     
     public function __construct($config, $debug = false) {
         $this->config = $config;
@@ -186,5 +187,24 @@ class GameState {
             return $last_response;
         }
         return null;
+    }
+
+    public function setLastCheckResult($result) {
+        $this->last_check_result = $result;
+        if ($this->debug) {
+            write_debug_log("Set last check result", [
+                'success' => $result['success'],
+                'total' => $result['total'],
+                'details' => $result['details']
+            ]);
+        }
+    }
+
+    public function getLastCheckResult() {
+        return $this->last_check_result;
+    }
+
+    public function clearLastCheckResult() {
+        $this->last_check_result = null;
     }
 } 

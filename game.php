@@ -299,8 +299,21 @@ while (true) {
                 break;
                 
             default:
-                if (preg_match('/^[1-4]$/', $user_input) && $scene_data && isset($scene_data->options[$user_input - 1])) {
-                    $chosen_option = $scene_data->options[$user_input - 1];
+                // Get the current options based on any recent skill check
+                $current_options = [];
+                if (isset($scene_data->options->success) && isset($scene_data->options->failure)) {
+                    $last_check = $gameState->getLastCheckResult();
+                    if ($last_check) {
+                        $current_options = $last_check['success'] ? $scene_data->options->success : $scene_data->options->failure;
+                    } else {
+                        $current_options = $scene_data->options->success;
+                    }
+                } else if (is_array($scene_data->options)) {
+                    $current_options = $scene_data->options;
+                }
+
+                if (preg_match('/^[1-4]$/', $user_input) && $scene_data && isset($current_options[$user_input - 1])) {
+                    $chosen_option = $current_options[$user_input - 1];
                     $last_user_input = $chosen_option;
                     $gameState->addMessage('user', $chosen_option);
                     $should_make_api_call = true;
@@ -374,10 +387,14 @@ function displayGameMenu($generate_image_toggle) {
 
 // Function to display scene
 function displayScene($scene_data, $generate_image_toggle = true, $imageHandler = null) {
-    if ($generate_image_toggle && isset($scene_data->image) && $imageHandler) {
+    if (!isset($scene_data->narrative)) {
+        return;
+    }
+
+    if ($generate_image_toggle && $imageHandler) {
+        // Try to display existing image first
         $ascii_art = null;
         
-        // Try to display existing image first
         if (isset($scene_data->timestamp)) {
             $ascii_art = $imageHandler->displayExistingImage($scene_data->timestamp);
             if ($ascii_art) {
@@ -398,7 +415,29 @@ function displayScene($scene_data, $generate_image_toggle = true, $imageHandler 
     $narrative = Utils::wrapText($scene_data->narrative);
     echo "\n" . Utils::colorize($narrative) . "\n\n";
     echo Utils::colorize("\n[bold]Choose your next action:[/bold]\n");
-    foreach ($scene_data->options as $index => $option) {
+
+    // Get the appropriate options based on the last check result
+    $options = [];
+    if (isset($scene_data->options->success) && isset($scene_data->options->failure)) {
+        global $gameState;
+        $last_check = $gameState->getLastCheckResult();
+        if ($last_check) {
+            $options = $last_check['success'] ? $scene_data->options->success : $scene_data->options->failure;
+            // Clear the check result after using it
+            $gameState->clearLastCheckResult();
+        } else {
+            // If no check result, use success options as default
+            $options = $scene_data->options->success;
+        }
+    } else if (is_array($scene_data->options)) {
+        // Handle legacy format where options is a simple array
+        $options = $scene_data->options;
+    } else {
+        // Fallback to empty array if no valid options found
+        $options = [];
+    }
+
+    foreach ($options as $index => $option) {
         $number = $index + 1;
         echo Utils::colorize("[cyan]{$number}. {$option}[/cyan]\n");
     }
