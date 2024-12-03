@@ -109,28 +109,52 @@ class ApiHandler {
         // Process sanity checks [SANITY_CHECK:difficulty]
         $narrative = preg_replace_callback(
             '/\[SANITY_CHECK:(\d+)\]/',
-            function($matches) use ($stats, &$mechanics_log, &$mechanics_applied) {
+            function($matches) use ($stats, &$mechanics_log, &$mechanics_applied, &$last_check_result) {
                 $difficulty = intval($matches[1]);
-                $result = $stats->sanityCheck($difficulty);
+                $result = $stats->skillCheck('Sanity', $difficulty);
                 $mechanics_applied = true;
-                
-                $mechanics_log[] = [
-                    'type' => 'sanity_check',
-                    'difficulty' => $difficulty,
-                    'roll' => $result['roll'],
-                    'modifier' => $result['modifier'] ?? 0,
-                    'total' => $result['total'],
-                    'success' => $result['success'],
-                    'sanity_loss' => $result['sanityLoss'] ?? 0,
-                    'current_sanity' => $result['currentSanity']
-                ];
-                
+                $last_check_result = $result;
+
+                if (!$result['success']) {
+                    $sanity_loss = rand(2, 4);
+                    $old_sanity = $stats->getStat('Sanity')['current'];
+                    $stats->modifyStat('Sanity', -$sanity_loss);
+                    $new_sanity = $stats->getStat('Sanity')['current'];
+                    
+                    if ($this->debug) {
+                        write_debug_log("Failed Sanity Check", [
+                            'old_sanity' => $old_sanity,
+                            'sanity_loss' => $sanity_loss,
+                            'new_sanity' => $new_sanity
+                        ]);
+                    }
+
+                    $mechanics_log[] = [
+                        'type' => 'sanity_loss',
+                        'amount' => $sanity_loss,
+                        'old_value' => $old_sanity,
+                        'new_value' => $new_sanity
+                    ];
+
+                    // Format the roll result for display in the narrative
+                    return sprintf(
+                        "\n🎲 Sanity Check: %d + %d (modifier) = %d vs DC %d - Failure! Lost %d Sanity points (Current: %d/%d)\n",
+                        $result['roll'],
+                        $result['modifier'],
+                        $result['total'],
+                        $difficulty,
+                        $sanity_loss,
+                        $new_sanity,
+                        $stats->getStat('Sanity')['max']
+                    );
+                }
+
                 return sprintf(
-                    "[%s on Sanity check (DC %d): %s%s]",
-                    $result['success'] ? "SUCCESS" : "FAILURE",
-                    $difficulty,
-                    $result['details'],
-                    !$result['success'] ? sprintf(". Lost %d Sanity points", $result['sanityLoss']) : ""
+                    "\n🎲 Sanity Check: %d + %d (modifier) = %d vs DC %d - Success!\n",
+                    $result['roll'],
+                    $result['modifier'],
+                    $result['total'],
+                    $difficulty
                 );
             },
             $narrative
@@ -156,7 +180,7 @@ class ApiHandler {
                 }
 
                 // Format the roll result for display in the narrative
-                $roll_text = sprintf(
+                return sprintf(
                     "\n🎲 %s Save: %d + %d (modifier) = %d vs DC %d - %s!\n",
                     $type,
                     $result['roll'],
@@ -165,8 +189,6 @@ class ApiHandler {
                     $difficulty,
                     $result['success'] ? "Success" : "Failure"
                 );
-                
-                return $roll_text;
             },
             $narrative
         );

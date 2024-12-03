@@ -37,7 +37,7 @@ class GameState {
                 $this->conversation_history = $data['conversation_history'] ?? [];
                 $this->mechanics_history = $data['mechanics_history'] ?? [];
                 if (isset($data['character_stats'])) {
-                    $this->character_stats->loadState($data['character_stats']);
+                    $this->character_stats->setState($data['character_stats']);
                 }
                 if ($this->debug) {
                     write_debug_log("Game state loaded", [
@@ -60,7 +60,7 @@ class GameState {
             'conversation' => $this->conversation,
             'conversation_history' => $this->conversation_history,
             'mechanics_history' => $this->mechanics_history,
-            'character_stats' => $this->character_stats->getState()
+            'character_stats' => $this->character_stats->getStats()
         ];
         
         if ($this->debug) {
@@ -72,11 +72,29 @@ class GameState {
             ]);
         }
         
+        // Save with pretty printing for better readability
         file_put_contents(
             $this->config['paths']['game_history_file'], 
-            json_encode($state), 
+            json_encode($state, JSON_PRETTY_PRINT), 
             LOCK_EX
         );
+        
+        // After saving, update the conversation with the latest stats
+        $this->updateConversationWithStats();
+    }
+    
+    private function updateConversationWithStats() {
+        // Find the last assistant message with a function call
+        for ($i = count($this->conversation) - 1; $i >= 0; $i--) {
+            $message = $this->conversation[$i];
+            if (isset($message['role']) && $message['role'] === 'assistant' && isset($message['function_call'])) {
+                if (isset($message['function_call']['name']) && $message['function_call']['name'] === 'GameResponse') {
+                    // Update the character_stats in the message
+                    $this->conversation[$i]['character_stats'] = $this->character_stats->getStats();
+                    break;
+                }
+            }
+        }
     }
     
     public function getConversation() {

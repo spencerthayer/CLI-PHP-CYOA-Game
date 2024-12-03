@@ -4,154 +4,151 @@ namespace App;
 
 class CharacterStats
 {
-    // Base Attributes
+    // Base Attributes with consistent structure
     private $attributes = [
-        'Vitality' => 10,
-        'Willpower' => 10,
-        'Endurance' => 10,
-        'Strength' => 10,
-        'Dexterity' => 10,
-        'Intellect' => 10,
-        'Faith' => 10,
-        'Luck' => 10,
-        'Sanity' => 10,
+        // Primary Attributes
+        'Strength' => ['current' => 10, 'max' => 10],
+        'Dexterity' => ['current' => 10, 'max' => 10],
+        'Vitality' => ['current' => 10, 'max' => 10],
+        'Intellect' => ['current' => 10, 'max' => 10],
+        'Willpower' => ['current' => 10, 'max' => 10],
+        'Faith' => ['current' => 10, 'max' => 10],
+        'Luck' => ['current' => 10, 'max' => 10],
+        'Endurance' => ['current' => 10, 'max' => 10],
+        
+        // Derived Stats - these will be calculated in initializeStats()
+        'HP' => ['current' => 0, 'max' => 0],
+        'FP' => ['current' => 0, 'max' => 0],
+        'Stamina' => ['current' => 0, 'max' => 0],
+        'Sanity' => ['current' => 0, 'max' => 0]
     ];
 
     private $level = 1;
-    private $baseHP = 10;
-    private $baseFP = 5;
-    private $baseStamina = 10;
-    private $currentHP;
-    private $currentFP;
-    private $currentStamina;
-    private $currentSanity;
+    private $experience = 0;
     private $debug = false;
+
+    // Base values for derived stats
+    private $baseValues = [
+        'HP' => 20,      // Base HP
+        'FP' => 10,      // Base Focus Points
+        'Stamina' => 10, // Base Stamina
+        'Sanity' => 20   // Base Sanity
+    ];
 
     public function __construct($debug = false)
     {
         $this->debug = $debug;
-        $this->currentHP = $this->calculateHP();
-        $this->currentFP = $this->calculateFP();
-        $this->currentStamina = $this->calculateStamina();
-        $this->currentSanity = $this->attributes['Sanity'];
+        $this->initializeStats();
 
         if ($this->debug) {
             write_debug_log("CharacterStats initialized", [
-                'attributes' => $this->attributes,
+                'stats' => $this->getStats()
+            ]);
+        }
+    }
+
+    private function initializeStats()
+    {
+        // Initialize Primary Attributes (already set in $attributes)
+        
+        // Initialize HP based on Vitality
+        $vitalityMod = $this->calculateModifier($this->attributes['Vitality']['current']);
+        $this->attributes['HP']['max'] = $this->baseValues['HP'] + ($vitalityMod * $this->level);
+        $this->attributes['HP']['current'] = $this->attributes['HP']['max'];
+        
+        // Initialize FP based on Willpower
+        $willpowerMod = $this->calculateModifier($this->attributes['Willpower']['current']);
+        $this->attributes['FP']['max'] = $this->baseValues['FP'] + ($willpowerMod * $this->level);
+        $this->attributes['FP']['current'] = $this->attributes['FP']['max'];
+        
+        // Initialize Stamina based on Endurance
+        $enduranceMod = $this->calculateModifier($this->attributes['Endurance']['current']);
+        $this->attributes['Stamina']['max'] = $this->baseValues['Stamina'] + ($enduranceMod * $this->level);
+        $this->attributes['Stamina']['current'] = $this->attributes['Stamina']['max'];
+
+        // Initialize Sanity based on Willpower
+        $this->attributes['Sanity']['max'] = $this->baseValues['Sanity'] + ($willpowerMod * $this->level);
+        $this->attributes['Sanity']['current'] = $this->attributes['Sanity']['max'];
+
+        if ($this->debug) {
+            write_debug_log("Stats Initialized", [
                 'derived_stats' => [
-                    'HP' => $this->currentHP,
-                    'FP' => $this->currentFP,
-                    'Stamina' => $this->currentStamina,
-                    'Sanity' => $this->currentSanity
+                    'HP' => $this->attributes['HP'],
+                    'FP' => $this->attributes['FP'],
+                    'Stamina' => $this->attributes['Stamina'],
+                    'Sanity' => $this->attributes['Sanity']
+                ],
+                'modifiers' => [
+                    'Vitality' => $vitalityMod,
+                    'Willpower' => $willpowerMod,
+                    'Endurance' => $enduranceMod
                 ]
             ]);
         }
     }
 
-    // Core Calculations
-    private function calculateModifier($score)
+    public function modifyStat($stat, $amount)
     {
-        $modifier = floor(($score - 10) / 2);
-        if ($this->debug) {
-            write_debug_log("Calculated modifier", [
-                'score' => $score,
-                'modifier' => $modifier
-            ]);
-        }
-        return $modifier;
-    }
-
-    public function calculateHP()
-    {
-        return $this->baseHP + ($this->calculateModifier($this->attributes['Vitality']) * $this->level);
-    }
-
-    public function calculateFP()
-    {
-        return $this->baseFP + ($this->calculateModifier($this->attributes['Willpower']) * $this->level);
-    }
-
-    public function calculateStamina()
-    {
-        return $this->baseStamina + ($this->calculateModifier($this->attributes['Endurance']) * $this->level);
-    }
-
-    public function calculateAC($armorBonus = 0)
-    {
-        return 10 + $this->calculateModifier($this->attributes['Dexterity']) + $armorBonus;
-    }
-
-    // Game Mechanics
-    public function takeDamage($amount)
-    {
-        $oldHP = $this->currentHP;
-        $this->currentHP = max(0, $this->currentHP - $amount);
-
-        if ($this->debug) {
-            write_debug_log("Taking Damage", [
-                'damage_amount' => $amount,
-                'old_hp' => $oldHP,
-                'new_hp' => $this->currentHP
-            ]);
+        if (!isset($this->attributes[$stat])) {
+            throw new \Exception("Invalid stat: $stat");
         }
 
-        return $this->currentHP;
-    }
-
-    public function heal($amount)
-    {
-        $oldHP = $this->currentHP;
-        $maxHP = $this->calculateHP();
-        $this->currentHP = min($maxHP, $this->currentHP + $amount);
+        $current = $this->attributes[$stat]['current'];
+        $max = $this->attributes[$stat]['max'];
+        $new_value = max(0, min($max, $current + $amount));
+        $this->attributes[$stat]['current'] = $new_value;
         
         if ($this->debug) {
-            write_debug_log("Healing applied", [
-                'old_hp' => $oldHP,
-                'amount_healed' => $amount,
-                'new_hp' => $this->currentHP,
-                'max_hp' => $maxHP
+            write_debug_log("Modified $stat", [
+                'old_value' => $current,
+                'change' => $amount,
+                'new_value' => $new_value,
+                'max' => $max
             ]);
         }
         
-        return $this->currentHP - $oldHP; // Return actual amount healed
+        return $new_value;
     }
 
-    public function useFP($amount)
+    public function setStatMax($stat, $value)
     {
-        if ($this->currentFP >= $amount) {
-            $this->currentFP -= $amount;
-            return true;
+        if (!isset($this->attributes[$stat])) {
+            throw new \Exception("Invalid stat: $stat");
         }
-        return false;
-    }
 
-    public function useStamina($amount)
-    {
-        if ($this->currentStamina >= $amount) {
-            $this->currentStamina -= $amount;
-            return true;
+        $old_max = $this->attributes[$stat]['max'];
+        $this->attributes[$stat]['max'] = max(0, $value);
+        
+        // Adjust current value if it exceeds new max
+        if ($this->attributes[$stat]['current'] > $this->attributes[$stat]['max']) {
+            $this->attributes[$stat]['current'] = $this->attributes[$stat]['max'];
         }
-        return false;
+        
+        if ($this->debug) {
+            write_debug_log("Modified $stat Max", [
+                'old_max' => $old_max,
+                'new_max' => $this->attributes[$stat]['max'],
+                'current' => $this->attributes[$stat]['current']
+            ]);
+        }
     }
 
-    public function rest()
-    {
-        $this->currentHP = $this->calculateHP();
-        $this->currentFP = $this->calculateFP();
-        $this->currentStamina = $this->calculateStamina();
-    }
-
-    // Skill Checks and Saves
     public function skillCheck($attribute, $difficulty = 15, $proficiencyBonus = 0)
     {
-        if (!array_key_exists($attribute, $this->attributes)) {
+        if (!isset($this->attributes[$attribute])) {
             throw new \Exception("Invalid attribute: $attribute");
         }
 
+        $attribute_value = $this->attributes[$attribute]['current'];
         $roll = rand(1, 20);
-        $modifier = $this->calculateModifier($this->attributes[$attribute]);
+        $modifier = $this->calculateModifier($attribute_value);
         $total = $roll + $modifier + $proficiencyBonus;
         $success = $total >= $difficulty;
+
+        if ($attribute === 'Sanity' && !$success) {
+            $sanity_loss = rand(2, 4);
+            $this->modifyStat('Sanity', -$sanity_loss);
+        }
 
         $result = [
             'success' => $success,
@@ -160,7 +157,7 @@ class CharacterStats
             'proficiency' => $proficiencyBonus,
             'total' => $total,
             'difficulty' => $difficulty,
-            'attribute_score' => $this->attributes[$attribute],
+            'attribute_score' => $attribute_value,
             'details' => sprintf(
                 "Rolled %d + %d (modifier) + %d (proficiency) = %d vs DC %d",
                 $roll, $modifier, $proficiencyBonus, $total, $difficulty
@@ -171,7 +168,7 @@ class CharacterStats
             write_debug_log("🎲 Skill Check Result", [
                 'type' => 'skill_check',
                 'attribute' => $attribute,
-                'base_score' => $this->attributes[$attribute],
+                'base_score' => $attribute_value,
                 'roll' => [
                     'die' => 'd20',
                     'result' => $roll,
@@ -207,8 +204,9 @@ class CharacterStats
                 throw new \Exception("Invalid saving throw type: $type");
         }
 
+        $attribute_value = $this->attributes[$attribute]['current'];
         $roll = rand(1, 20);
-        $modifier = $this->calculateModifier($this->attributes[$attribute]);
+        $modifier = $this->calculateModifier($attribute_value);
         $total = $roll + $modifier;
         $success = $total >= $difficulty;
 
@@ -220,7 +218,7 @@ class CharacterStats
             'difficulty' => $difficulty,
             'save_type' => $type,
             'attribute' => $attribute,
-            'attribute_score' => $this->attributes[$attribute],
+            'attribute_score' => $attribute_value,
             'details' => sprintf(
                 "Rolled %d + %d (modifier) = %d vs DC %d",
                 $roll, $modifier, $total, $difficulty
@@ -232,7 +230,7 @@ class CharacterStats
                 'type' => 'saving_throw',
                 'save_type' => $type,
                 'attribute' => $attribute,
-                'base_score' => $this->attributes[$attribute],
+                'base_score' => $attribute_value,
                 'roll' => [
                     'die' => 'd20',
                     'result' => $roll,
@@ -255,163 +253,200 @@ class CharacterStats
         $result = $this->skillCheck('Sanity', $difficulty);
         
         if (!$result['success']) {
-            $sanityLoss = rand(1, 4); // 1d4 sanity loss on failure
-            $oldSanity = $this->currentSanity;
-            $this->currentSanity = max(0, $this->currentSanity - $sanityLoss);
+            $sanity_loss = rand(2, 4);
+            $old_sanity = $this->attributes['Sanity']['current'];
+            $this->modifyStat('Sanity', -$sanity_loss);
             
             if ($this->debug) {
                 write_debug_log("Failed Sanity Check", [
-                    'old_sanity' => $oldSanity,
-                    'sanity_loss' => $sanityLoss,
-                    'new_sanity' => $this->currentSanity
+                    'old_sanity' => $old_sanity,
+                    'sanity_loss' => $sanity_loss,
+                    'new_sanity' => $this->attributes['Sanity']['current']
                 ]);
             }
             
-            $result['sanityLoss'] = $sanityLoss;
-            $result['currentSanity'] = $this->currentSanity;
+            $result['sanityLoss'] = $sanity_loss;
+            $result['currentSanity'] = $this->attributes['Sanity']['current'];
         }
         
         return $result;
     }
 
-    // Attribute Modification Methods
-    public function modifyAttribute($attribute, $amount)
+    public function takeDamage($amount)
     {
-        if (!isset($this->attributes[$attribute])) {
-            if ($this->debug) {
-                write_debug_log("Invalid attribute modification attempt", [
-                    'attribute' => $attribute,
-                    'amount' => $amount
-                ]);
-            }
-            return false;
+        $old_hp = $this->attributes['HP']['current'];
+        $this->modifyStat('HP', -$amount);
+        $new_hp = $this->attributes['HP']['current'];
+
+        if ($this->debug) {
+            write_debug_log("Taking Damage", [
+                'damage_amount' => $amount,
+                'old_hp' => $old_hp,
+                'new_hp' => $new_hp
+            ]);
         }
 
-        $oldValue = $this->attributes[$attribute];
-        $this->attributes[$attribute] = max(0, min(20, $oldValue + $amount)); // Cap between 0 and 20
+        return $new_hp;
+    }
+
+    public function heal($amount)
+    {
+        $old_hp = $this->attributes['HP']['current'];
+        $this->modifyStat('HP', $amount);
+        $new_hp = $this->attributes['HP']['current'];
         
         if ($this->debug) {
-            write_debug_log("Attribute modified", [
-                'attribute' => $attribute,
-                'old_value' => $oldValue,
-                'change' => $amount,
-                'new_value' => $this->attributes[$attribute]
+            write_debug_log("Healing applied", [
+                'old_hp' => $old_hp,
+                'amount_healed' => $amount,
+                'new_hp' => $new_hp,
+                'max_hp' => $this->attributes['HP']['max']
             ]);
         }
         
-        return true;
+        return $new_hp - $old_hp; // Return actual amount healed
     }
 
-    public function gainExperience($amount)
+    public function useFP($amount)
     {
-        $oldLevel = $this->level;
-        $this->level += $amount;
-        
-        if ($this->debug) {
-            write_debug_log("Experience gained", [
-                'old_level' => $oldLevel,
-                'amount_gained' => $amount,
-                'new_level' => $this->level
-            ]);
-        }
-        
-        return true;
-    }
-
-    public function restoreSanity($amount)
-    {
-        $oldSanity = $this->currentSanity;
-        $maxSanity = $this->attributes['Sanity'];
-        $this->currentSanity = min($maxSanity, $this->currentSanity + $amount);
-        
-        if ($this->debug) {
-            write_debug_log("Sanity restored", [
-                'old_sanity' => $oldSanity,
-                'amount_restored' => $amount,
-                'new_sanity' => $this->currentSanity,
-                'max_sanity' => $maxSanity
-            ]);
-        }
-        
-        return $this->currentSanity - $oldSanity; // Return actual amount restored
-    }
-
-    // Getters and Setters
-    public function getAttribute($attribute)
-    {
-        return $this->attributes[$attribute] ?? null;
-    }
-
-    public function setAttribute($attribute, $value)
-    {
-        if (array_key_exists($attribute, $this->attributes)) {
-            $this->attributes[$attribute] = max(1, min(20, $value)); // Limit attributes between 1 and 20
+        if ($this->attributes['FP']['current'] >= $amount) {
+            $this->modifyStat('FP', -$amount);
             return true;
         }
         return false;
     }
 
-    public function getLevel() 
-    { 
-        return $this->level; 
+    public function useStamina($amount)
+    {
+        if ($this->attributes['Stamina']['current'] >= $amount) {
+            $this->modifyStat('Stamina', -$amount);
+            return true;
+        }
+        return false;
     }
 
-    public function setLevel($level) 
-    { 
-        $this->level = max(1, $level); 
+    public function rest()
+    {
+        $stats_to_restore = ['HP', 'FP', 'Stamina'];
+        foreach ($stats_to_restore as $stat) {
+            $this->modifyStat($stat, $this->attributes[$stat]['max']);
+        }
+        
+        if ($this->debug) {
+            write_debug_log("Rest completed", [
+                'restored_stats' => array_map(function($stat) {
+                    return [
+                        'stat' => $stat,
+                        'current' => $this->attributes[$stat]['current'],
+                        'max' => $this->attributes[$stat]['max']
+                    ];
+                }, $stats_to_restore)
+            ]);
+        }
     }
 
-    public function getCurrentHP() 
-    { 
-        return $this->currentHP; 
+    public function calculateAC($armorBonus = 0)
+    {
+        return 10 + $this->calculateModifier($this->attributes['Dexterity']['current']) + $armorBonus;
     }
 
-    public function getCurrentFP() 
-    { 
-        return $this->currentFP; 
+    private function calculateModifier($score)
+    {
+        return floor(($score - 10) / 2);
     }
 
-    public function getCurrentStamina() 
-    { 
-        return $this->currentStamina; 
+    public function recalculateStats()
+    {
+        // Store current percentages of resources
+        $percentages = [];
+        foreach (['HP', 'FP', 'Stamina', 'Sanity'] as $stat) {
+            $percentages[$stat] = $this->attributes[$stat]['current'] / $this->attributes[$stat]['max'];
+        }
+
+        // Recalculate max values
+        $vitalityMod = $this->calculateModifier($this->attributes['Vitality']['current']);
+        $willpowerMod = $this->calculateModifier($this->attributes['Willpower']['current']);
+        $enduranceMod = $this->calculateModifier($this->attributes['Endurance']['current']);
+
+        $this->attributes['HP']['max'] = $this->baseValues['HP'] + ($vitalityMod * $this->level);
+        $this->attributes['FP']['max'] = $this->baseValues['FP'] + ($willpowerMod * $this->level);
+        $this->attributes['Stamina']['max'] = $this->baseValues['Stamina'] + ($enduranceMod * $this->level);
+        $this->attributes['Sanity']['max'] = $this->baseValues['Sanity'] + ($willpowerMod * $this->level);
+
+        // Restore current values maintaining percentages
+        foreach (['HP', 'FP', 'Stamina', 'Sanity'] as $stat) {
+            $this->attributes[$stat]['current'] = round($this->attributes[$stat]['max'] * $percentages[$stat]);
+        }
+
+        if ($this->debug) {
+            write_debug_log("Stats Recalculated", [
+                'new_values' => [
+                    'HP' => $this->attributes['HP'],
+                    'FP' => $this->attributes['FP'],
+                    'Stamina' => $this->attributes['Stamina'],
+                    'Sanity' => $this->attributes['Sanity']
+                ]
+            ]);
+        }
     }
 
-    public function getCurrentSanity() 
-    { 
-        return $this->currentSanity; 
+    public function gainExperience($amount)
+    {
+        $oldLevel = $this->level;
+        $this->experience += $amount;
+        
+        // Simple leveling formula: level = floor(experience / 1000) + 1
+        $newLevel = floor($this->experience / 1000) + 1;
+        
+        if ($newLevel > $oldLevel) {
+            $this->level = $newLevel;
+            $this->onLevelUp();
+        }
     }
 
-    // State Management
+    private function onLevelUp()
+    {
+        // Increase primary attributes
+        $primaryAttributes = ['Strength', 'Dexterity', 'Vitality', 'Intellect', 'Willpower', 'Faith', 'Luck', 'Endurance'];
+        foreach ($primaryAttributes as $attr) {
+            if (rand(1, 100) <= 30) { // 30% chance to increase each attribute
+                $this->attributes[$attr]['max'] += 1;
+                $this->attributes[$attr]['current'] = $this->attributes[$attr]['max'];
+            }
+        }
+
+        // Recalculate derived stats with new attribute values
+        $this->recalculateStats();
+
+        // Fully restore all resources on level up
+        foreach (['HP', 'FP', 'Stamina', 'Sanity'] as $stat) {
+            $this->attributes[$stat]['current'] = $this->attributes[$stat]['max'];
+        }
+
+        if ($this->debug) {
+            write_debug_log("Level Up!", [
+                'new_level' => $this->level,
+                'primary_attributes' => array_intersect_key($this->attributes, array_flip($primaryAttributes)),
+                'derived_stats' => [
+                    'HP' => $this->attributes['HP'],
+                    'FP' => $this->attributes['FP'],
+                    'Stamina' => $this->attributes['Stamina'],
+                    'Sanity' => $this->attributes['Sanity']
+                ]
+            ]);
+        }
+    }
+
     public function getStats()
     {
         return [
-            'Vitality' => $this->attributes['Vitality'],
-            'Willpower' => $this->attributes['Willpower'],
-            'Endurance' => $this->attributes['Endurance'],
-            'Strength' => $this->attributes['Strength'],
-            'Dexterity' => $this->attributes['Dexterity'],
-            'Intellect' => $this->attributes['Intellect'],
-            'Faith' => $this->attributes['Faith'],
-            'Luck' => $this->attributes['Luck'],
-            'Sanity' => $this->attributes['Sanity'],
-            'hp' => [
-                'current' => $this->currentHP,
-                'max' => $this->calculateHP()
-            ],
-            'sanity' => [
-                'current' => $this->currentSanity,
-                'max' => $this->attributes['Sanity']
-            ],
-            'level' => $this->level
+            'attributes' => $this->attributes,
+            'level' => $this->level,
+            'experience' => $this->experience
         ];
     }
 
-    public function getState()
-    {
-        return $this->getStats();
-    }
-
-    public function loadState($state)
+    public function setState($state)
     {
         if (isset($state['attributes'])) {
             $this->attributes = $state['attributes'];
@@ -419,20 +454,24 @@ class CharacterStats
         if (isset($state['level'])) {
             $this->level = $state['level'];
         }
-        if (isset($state['currentHP'])) {
-            $this->currentHP = $state['currentHP'];
-        }
-        if (isset($state['currentSanity'])) {
-            $this->currentSanity = $state['currentSanity'];
+        if (isset($state['experience'])) {
+            $this->experience = $state['experience'];
         }
         
         if ($this->debug) {
-            write_debug_log("Character state loaded", [
-                'attributes' => $this->attributes,
-                'level' => $this->level,
-                'hp' => $this->currentHP,
-                'sanity' => $this->currentSanity
-            ]);
+            write_debug_log("State Loaded", $this->getStats());
         }
+    }
+
+    // Getters
+    public function getLevel() { return $this->level; }
+    public function getExperience() { return $this->experience; }
+    
+    public function getStat($stat) 
+    {
+        if (!isset($this->attributes[$stat])) {
+            throw new \Exception("Invalid stat: $stat");
+        }
+        return $this->attributes[$stat];
     }
 }

@@ -314,6 +314,82 @@ while (true) {
 
                 if (preg_match('/^[1-4]$/', $user_input) && $scene_data && isset($current_options[$user_input - 1])) {
                     $chosen_option = $current_options[$user_input - 1];
+                    
+                    // Check for various types of checks in the option text
+                    $check_patterns = [
+                        'SKILL_CHECK' => '/\[SKILL_CHECK:(\w+):(\d+)\]/',
+                        'SAVE' => '/\[SAVE:(\w+):(\d+)\]/',
+                        'SANITY_CHECK' => '/\[SANITY_CHECK:(\d+)\]/'
+                    ];
+                    
+                    foreach ($check_patterns as $check_type => $pattern) {
+                        if (preg_match($pattern, $chosen_option, $matches)) {
+                            $result = null;
+                            
+                            switch ($check_type) {
+                                case 'SKILL_CHECK':
+                                    $attribute = $matches[1];
+                                    $difficulty = intval($matches[2]);
+                                    $result = $gameState->getCharacterStats()->skillCheck($attribute, $difficulty);
+                                    echo Utils::colorize(sprintf(
+                                        "\n🎲 [cyan]%s Check[/cyan]: %d + %d (modifier) + %d (proficiency) = [bold]%d[/bold] vs DC %d - [%s]%s[/%s]!\n",
+                                        $attribute,
+                                        $result['roll'],
+                                        $result['modifier'],
+                                        $result['proficiency'],
+                                        $result['total'],
+                                        $difficulty,
+                                        $result['success'] ? 'green' : 'red',
+                                        $result['success'] ? "Success" : "Failure",
+                                        $result['success'] ? 'green' : 'red'
+                                    ));
+                                    break;
+                                    
+                                case 'SAVE':
+                                    $save_type = $matches[1];
+                                    $difficulty = intval($matches[2]);
+                                    $result = $gameState->getCharacterStats()->savingThrow($save_type, $difficulty);
+                                    echo Utils::colorize(sprintf(
+                                        "\n🎲 [cyan]%s Save[/cyan]: %d + %d (modifier) = [bold]%d[/bold] vs DC %d - [%s]%s[/%s]!\n",
+                                        $save_type,
+                                        $result['roll'],
+                                        $result['modifier'],
+                                        $result['total'],
+                                        $difficulty,
+                                        $result['success'] ? 'green' : 'red',
+                                        $result['success'] ? "Success" : "Failure",
+                                        $result['success'] ? 'green' : 'red'
+                                    ));
+                                    break;
+                                    
+                                case 'SANITY_CHECK':
+                                    $difficulty = intval($matches[1]);
+                                    $result = $gameState->getCharacterStats()->sanityCheck($difficulty);
+                                    echo Utils::colorize(sprintf(
+                                        "\n🎲 [cyan]Sanity Check[/cyan]: %d + %d (modifier) = [bold]%d[/bold] vs DC %d - [%s]%s[/%s]!%s\n",
+                                        $result['roll'],
+                                        $result['modifier'],
+                                        $result['total'],
+                                        $difficulty,
+                                        $result['success'] ? 'green' : 'red',
+                                        $result['success'] ? "Success" : "Failure",
+                                        $result['success'] ? 'green' : 'red',
+                                        !$result['success'] ? Utils::colorize(sprintf(
+                                            "\n[red]Lost %d Sanity! Current Sanity: %d/%d[/red]",
+                                            $result['sanityLoss'],
+                                            $result['currentSanity'],
+                                            $gameState->getCharacterStats()->getStat('Sanity')['max']
+                                        )) : ""
+                                    ));
+                                    break;
+                            }
+                            
+                            if ($result) {
+                                $gameState->setLastCheckResult($result);
+                            }
+                        }
+                    }
+                    
                     $last_user_input = $chosen_option;
                     $gameState->addMessage('user', $chosen_option);
                     $should_make_api_call = true;
