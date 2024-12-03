@@ -21,6 +21,55 @@ class ApiHandler {
         $mechanics_applied = false;
         $last_check_result = null;
 
+        // Process action-based checks [Attribute DC:difficulty]
+        $narrative = preg_replace_callback(
+            '/\[(\w+)\s+DC:(\d+)\]/',
+            function($matches) use ($stats, &$mechanics_log, &$mechanics_applied, &$last_check_result) {
+                $attribute = $matches[1];
+                $difficulty = intval($matches[2]);
+                
+                // Handle different types of checks
+                if (in_array($attribute, ['Strength', 'Dexterity', 'Vitality', 'Intellect', 'Willpower', 'Faith', 'Luck'])) {
+                    $result = $stats->skillCheck($attribute, $difficulty);
+                    $roll_text = sprintf(
+                        "\n🎲 %s Check: %d + %d (modifier) = %d vs DC %d - %s!\n",
+                        $attribute,
+                        $result['roll'],
+                        $result['modifier'],
+                        $result['total'],
+                        $difficulty,
+                        $result['success'] ? "Success" : "Failure"
+                    );
+                } else {
+                    $result = $stats->savingThrow($attribute, $difficulty);
+                    $roll_text = sprintf(
+                        "\n🎲 %s Save: %d + %d (modifier) = %d vs DC %d - %s!\n",
+                        $attribute,
+                        $result['roll'],
+                        $result['modifier'],
+                        $result['total'],
+                        $difficulty,
+                        $result['success'] ? "Success" : "Failure"
+                    );
+                }
+                
+                $mechanics_applied = true;
+                $last_check_result = $result;
+                
+                if ($this->debug) {
+                    write_debug_log("🎲 Action Check Result", [
+                        'type' => 'action_check',
+                        'attribute' => $attribute,
+                        'roll_result' => $result,
+                        'success' => $result['success']
+                    ]);
+                }
+                
+                return $roll_text;
+            },
+            $narrative
+        );
+
         // Process attribute modifications [MODIFY_ATTRIBUTE:attribute:amount]
         $narrative = preg_replace_callback(
             '/\[MODIFY_ATTRIBUTE:(\w+):([+-]?\d+)\]/',
@@ -366,17 +415,33 @@ class ApiHandler {
     }
 
     public function makeApiCall($conversation) {
-        // Get the last user message to check for skill check
+        // Get the last user message to check for action-based skill checks
         $last_message = end($conversation);
-        $has_skill_check = preg_match('/\[SKILL_CHECK:(\w+):(\d+)\]/', $last_message['content'], $matches);
+        $has_skill_check = preg_match('/\[(\w+)\s+DC:(\d+)\]/', $last_message['content'], $matches);
         
         if ($has_skill_check) {
-            // Pre-roll the skill check
+            // Pre-roll the skill check based on the action's DC
             $attribute = $matches[1];
             $difficulty = intval($matches[2]);
             $stats = $this->game_state->getCharacterStats();
-            $check_result = $stats->skillCheck($attribute, $difficulty);
+            
+            // Handle different types of checks
+            if (in_array($attribute, ['Strength', 'Dexterity', 'Vitality', 'Intellect', 'Willpower', 'Faith', 'Luck'])) {
+                $check_result = $stats->skillCheck($attribute, $difficulty);
+            } else {
+                $check_result = $stats->savingThrow($attribute, $difficulty);
+            }
+            
             $this->game_state->setLastCheckResult($check_result);
+            
+            if ($this->debug) {
+                write_debug_log("Action Check Result", [
+                    'type' => 'action_check',
+                    'attribute' => $attribute,
+                    'difficulty' => $difficulty,
+                    'result' => $check_result
+                ]);
+            }
         }
 
         // Get current stats for the system message
@@ -388,7 +453,7 @@ class ApiHandler {
                 [
                     [
                         'role' => 'system',
-                        'content' => "You are narrating a dark fantasy RPG game. The player's current stats are:\n" .
+                        'content' => "You are narrating a dark fantasy RPG game. Provide immersive narrative descriptions but DO NOT include the options list in the narrative - they will be displayed separately. The player's current stats are:\n" .
                             "Strength: " . $current_stats['attributes']['Strength']['current'] . " (modifier: " . floor(($current_stats['attributes']['Strength']['current'] - 10) / 2) . ")\n" .
                             "Dexterity: " . $current_stats['attributes']['Dexterity']['current'] . " (modifier: " . floor(($current_stats['attributes']['Dexterity']['current'] - 10) / 2) . ")\n" .
                             "Vitality: " . $current_stats['attributes']['Vitality']['current'] . " (modifier: " . floor(($current_stats['attributes']['Vitality']['current'] - 10) / 2) . ")\n" .
@@ -411,22 +476,33 @@ class ApiHandler {
             'functions' => [
                 [
                     'name' => 'GameResponse',
-                    'description' => 'Response from the game, containing the narrative, options, and image prompt.',
+                    'description' => 'Response from the game, containing narrative description and available options. The narrative should be immersive but should NOT include the options list - options will be displayed separately.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
                             'narrative' => [
                                 'type' => 'string',
-                                'description' => 'The main story text describing the current scene'
+                                'description' => 'A rich, atmospheric description of the current scene and its events. Do not include the options list in this field.'
                             ],
                             'options' => [
-                                'type' => 'array',
-                                'items' => [
-                                    'type' => 'string'
-                                ],
-                                'minItems' => 4,
-                                'maxItems' => 4,
-                                'description' => 'Exactly 4 options for the player to choose from'
+                                'type' => 'object',
+                                'description' => 'Available actions for the player. These will be displayed separately from the narrative.',
+                                'properties' => [
+                                    'success' => [
+                                        'type' => 'array',
+                                        'description' => 'List of options to show if the last check was successful',
+                                        'items' => [
+                                            'type' => 'string'
+                                        ]
+                                    ],
+                                    'failure' => [
+                                        'type' => 'array',
+                                        'description' => 'List of options to show if the last check failed',
+                                        'items' => [
+                                            'type' => 'string'
+                                        ]
+                                    ]
+                                ]
                             ],
                             'image' => [
                                 'type' => 'object',
