@@ -473,7 +473,7 @@ class ApiHandler {
                 [
                     [
                         'role' => 'system',
-                        'content' => "You are narrating a dark fantasy RPG game. Provide immersive narrative descriptions but DO NOT include the options list in the narrative - options will be displayed separately." . 
+                        'content' => "You are narrating a dark fantasy RPG game. Provide immersive narrative descriptions but DO NOT include the options list in the narrative - options will be displayed separately. Each action choice MUST include a skill check in the format [Attribute DC:difficulty], where difficulty is between 4 and 18. Use emojis to enhance the presentation of choices." . 
                             ($has_skill_check ? "\nLAST SKILL CHECK RESULT: " . $attribute . " Check " . ($check_result['success'] ? "SUCCEEDED" : "FAILED") . 
                             " (Rolled: " . $check_result['roll'] . " + " . $check_result['modifier'] . " = " . $check_result['total'] . " vs DC " . $difficulty . ")" : "") .
                             "\n\nThe player's current stats are:\n" .
