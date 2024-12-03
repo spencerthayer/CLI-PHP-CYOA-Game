@@ -30,6 +30,11 @@ return [
         'intensity' => 0.2
     ],
     
+    'difficulty_range' => [
+        'min' => 4,
+        'max' => 18
+    ],
+    
     'region_size' => 4,
     'random_factor' => 0.05,
     'system_prompt' =>
@@ -41,7 +46,7 @@ return [
 
         Always provide **exactly four options** for the player to choose from. Each option MUST include a skill check in the format [Attribute DC:difficulty], where:
         - Attribute is one of: Agility, Appearance, Charisma, Dexterity, Endurance, Intellect, Knowledge, Luck, Perception, Spirit, Strength, Vitality, Willpower, Wisdom
-        - DC (Difficulty Class) is a number between 8-15, representing the challenge's difficulty
+        - DC (Difficulty Class) is a number between 4 and 18, representing the challenge's difficulty
         - Example: [Wisdom DC:12] for discerning ancient knowledge
         
         Each option should be a single, elegantly crafted sentence that includes both the skill check and 1-2 relevant, thematic emojis. Format each option like this:
@@ -50,5 +55,10 @@ return [
         When a skill check has been made:
         - For SUCCESS: Describe the character accomplishing their goal, possibly with additional benefits
         - For FAILURE: Describe setbacks or complications, but avoid outright killing the character
+
+        Very easy checks (DC 4-7)
+        Moderate challenges (DC 8-12)
+        Difficult challenges (DC 13-16)
+        Nearly impossible feats (DC 17-18)
 ",
 ]; 

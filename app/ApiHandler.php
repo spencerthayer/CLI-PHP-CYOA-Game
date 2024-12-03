@@ -379,6 +379,20 @@ class ApiHandler {
         ];
     }
     
+    private function formatStatString($stats, $attributes) {
+        $output = '';
+        foreach ($attributes as $attr) {
+            $stat = $stats->getStat($attr);
+            $modifier = floor(($stat['current'] - 10) / 2);
+            $output .= sprintf("%s: %d (modifier: %d)\n", 
+                $attr, 
+                $stat['current'], 
+                $modifier
+            );
+        }
+        return $output;
+    }
+
     private function processApiResponse($response_data) {
         if (!isset($response_data['choices'][0]['message']['function_call'])) {
             throw new \Exception("Unexpected API response format");
@@ -467,31 +481,26 @@ class ApiHandler {
         $stats = $this->game_state->getCharacterStats();
         $current_stats = $stats->getStats();
         
+        $attributes = [
+            'Agility', 'Appearance', 'Charisma', 'Dexterity', 
+            'Endurance', 'Intellect', 'Knowledge', 'Luck', 
+            'Perception', 'Spirit', 'Strength', 'Vitality', 
+            'Willpower', 'Wisdom'
+        ];
+        $formattedStats = $this->formatStatString($stats, $attributes);
+
         $data = [
             'model' => $this->config['api']['model'],
             'messages' => array_merge(
                 [
                     [
                         'role' => 'system',
-                        'content' => "You are narrating a dark fantasy RPG game. Provide immersive narrative descriptions but DO NOT include the options list in the narrative - options will be displayed separately. Each action choice MUST include a skill check in the format [Attribute DC:difficulty], where difficulty is between 4 and 18. Use emojis to enhance the presentation of choices." . 
+                        'content' => "You are narrating a dark fantasy RPG game. Provide immersive narrative descriptions but DO NOT include the options list in the narrative - options will be displayed separately. Each action choice MUST include a skill check in the format [Attribute DC:difficulty], where difficulty is between " . $this->config['difficulty_range']['min'] . " and " . $this->config['difficulty_range']['max'] . ", representing a range from trivial to nearly impossible challenges. Use emojis to enhance the presentation of choices." . 
                             ($has_skill_check ? "\nLAST SKILL CHECK RESULT: " . $attribute . " Check " . ($check_result['success'] ? "SUCCEEDED" : "FAILED") . 
                             " (Rolled: " . $check_result['roll'] . " + " . $check_result['modifier'] . " = " . $check_result['total'] . " vs DC " . $difficulty . ")" : "") .
                             "\n\nThe player's current stats are:\n" .
                             "Primary Attributes:\n" .
-                            "Agility: " . $stats->getStat('Agility')['current'] . " (modifier: " . floor(($stats->getStat('Agility')['current'] - 10) / 2) . ")\n" .
-                            "Appearance: " . $stats->getStat('Appearance')['current'] . " (modifier: " . floor(($stats->getStat('Appearance')['current'] - 10) / 2) . ")\n" .
-                            "Charisma: " . $stats->getStat('Charisma')['current'] . " (modifier: " . floor(($stats->getStat('Charisma')['current'] - 10) / 2) . ")\n" .
-                            "Dexterity: " . $stats->getStat('Dexterity')['current'] . " (modifier: " . floor(($stats->getStat('Dexterity')['current'] - 10) / 2) . ")\n" .
-                            "Endurance: " . $stats->getStat('Endurance')['current'] . " (modifier: " . floor(($stats->getStat('Endurance')['current'] - 10) / 2) . ")\n" .
-                            "Intellect: " . $stats->getStat('Intellect')['current'] . " (modifier: " . floor(($stats->getStat('Intellect')['current'] - 10) / 2) . ")\n" .
-                            "Knowledge: " . $stats->getStat('Knowledge')['current'] . " (modifier: " . floor(($stats->getStat('Knowledge')['current'] - 10) / 2) . ")\n" .
-                            "Luck: " . $stats->getStat('Luck')['current'] . " (modifier: " . floor(($stats->getStat('Luck')['current'] - 10) / 2) . ")\n" .
-                            "Perception: " . $stats->getStat('Perception')['current'] . " (modifier: " . floor(($stats->getStat('Perception')['current'] - 10) / 2) . ")\n" .
-                            "Spirit: " . $stats->getStat('Spirit')['current'] . " (modifier: " . floor(($stats->getStat('Spirit')['current'] - 10) / 2) . ")\n" .
-                            "Strength: " . $stats->getStat('Strength')['current'] . " (modifier: " . floor(($stats->getStat('Strength')['current'] - 10) / 2) . ")\n" .
-                            "Vitality: " . $stats->getStat('Vitality')['current'] . " (modifier: " . floor(($stats->getStat('Vitality')['current'] - 10) / 2) . ")\n" .
-                            "Willpower: " . $stats->getStat('Willpower')['current'] . " (modifier: " . floor(($stats->getStat('Willpower')['current'] - 10) / 2) . ")\n" .
-                            "Wisdom: " . $stats->getStat('Wisdom')['current'] . " (modifier: " . floor(($stats->getStat('Wisdom')['current'] - 10) / 2) . ")\n\n" .
+                            $formattedStats .
                             "Derived Stats:\n" .
                             "Health: " . $stats->getStat('Health')['current'] . "/" . $stats->getStat('Health')['max'] . "\n" .
                             "Focus: " . $stats->getStat('Focus')['current'] . "/" . $stats->getStat('Focus')['max'] . "\n" .
