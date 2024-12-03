@@ -7,20 +7,20 @@ class CharacterStats
     // Base Attributes with consistent structure
     private $attributes = [
         // Primary Attributes
-        'Agility'    => ['current' => 10, 'max' => 20],
-        'Appearance' => ['current' => 10, 'max' => 20],
-        'Charisma'   => ['current' => 10, 'max' => 20],
-        'Dexterity'  => ['current' => 10, 'max' => 20],
-        'Endurance'  => ['current' => 10, 'max' => 20],
-        'Intellect'  => ['current' => 10, 'max' => 20],
-        'Knowledge'  => ['current' => 10, 'max' => 20],
-        'Luck'       => ['current' => 10, 'max' => 20],
-        'Perception' => ['current' => 10, 'max' => 20],
-        'Spirit'     => ['current' => 10, 'max' => 20],
-        'Strength'   => ['current' => 10, 'max' => 20],
-        'Vitality'   => ['current' => 10, 'max' => 20],
-        'Willpower'  => ['current' => 10, 'max' => 20],
-        'Wisdom'     => ['current' => 10, 'max' => 20],
+        'Agility'    => ['current' => null, 'max' => 20],
+        'Appearance' => ['current' => null, 'max' => 20],
+        'Charisma'   => ['current' => null, 'max' => 20],
+        'Dexterity'  => ['current' => null, 'max' => 20],
+        'Endurance'  => ['current' => null, 'max' => 20],
+        'Intellect'  => ['current' => null, 'max' => 20],
+        'Knowledge'  => ['current' => null, 'max' => 20],
+        'Luck'       => ['current' => null, 'max' => 20],
+        'Perception' => ['current' => null, 'max' => 20],
+        'Spirit'     => ['current' => null, 'max' => 20],
+        'Strength'   => ['current' => null, 'max' => 20],
+        'Vitality'   => ['current' => null, 'max' => 20],
+        'Willpower'  => ['current' => null, 'max' => 20],
+        'Wisdom'     => ['current' => null, 'max' => 20],
         
         // Derived Stats - these will be calculated in initializeStats()
         'Focus'   => ['current' => 0, 'max' => 0],
@@ -55,7 +55,12 @@ class CharacterStats
 
     private function initializeStats()
     {
-        // Initialize Primary Attributes (already set in $attributes)
+        // Initialize Primary Attributes with random values between 8 and 18
+        foreach ($this->attributes as $attribute => $values) {
+            if ($attribute !== 'Health' && $attribute !== 'Focus' && $attribute !== 'Stamina' && $attribute !== 'Sanity') {
+                $this->attributes[$attribute]['current'] = random_int(8, 18);
+            }
+        }
         
         // Initialize Health based on Vitality
         $vitalityMod = $this->calculateModifier($this->attributes['Vitality']['current']);
