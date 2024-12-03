@@ -160,15 +160,29 @@ class CharacterStats
         }
 
         $attribute_value = $this->attributes[$attribute]['current'];
+        
+        if ($this->debug) {
+            write_debug_log("Skill Check Debug", [
+                'attribute_name' => $attribute,
+                'attribute_raw' => $this->attributes[$attribute],
+                'attribute_value' => $attribute_value,
+                'difficulty' => $difficulty
+            ]);
+        }
+        
         $roll = rand(1, 20);
         $modifier = $this->calculateModifier($attribute_value);
+        
+        if ($this->debug) {
+            write_debug_log("Modifier Calculation", [
+                'attribute_value' => $attribute_value,
+                'calculation' => "floor(($attribute_value - 10) / 2)",
+                'modifier_result' => $modifier
+            ]);
+        }
+        
         $total = $roll + $modifier + $proficiencyBonus;
         $success = $total >= $difficulty;
-
-        if ($attribute === 'Sanity' && !$success) {
-            $sanity_loss = rand(2, 4);
-            $this->modifyStat('Sanity', -$sanity_loss);
-        }
 
         $result = [
             'success' => $success,
@@ -183,6 +197,11 @@ class CharacterStats
                 $roll, $modifier, $proficiencyBonus, $total, $difficulty
             )
         ];
+
+        if ($attribute === 'Sanity' && !$success) {
+            $sanity_loss = rand(2, 4);
+            $this->modifyStat('Sanity', -$sanity_loss);
+        }
 
         if ($this->debug) {
             write_debug_log("🎲 Skill Check Result", [
