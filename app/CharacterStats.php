@@ -273,22 +273,32 @@ class CharacterStats
     }
 
     // State Management
+    public function getStats() {
+        return [
+            'Vitality' => $this->attributes['Vitality'],
+            'Willpower' => $this->attributes['Willpower'],
+            'Endurance' => $this->attributes['Endurance'],
+            'Strength' => $this->attributes['Strength'],
+            'Dexterity' => $this->attributes['Dexterity'],
+            'Intellect' => $this->attributes['Intellect'],
+            'Faith' => $this->attributes['Faith'],
+            'Luck' => $this->attributes['Luck'],
+            'Sanity' => $this->attributes['Sanity'],
+            'hp' => [
+                'current' => $this->currentHP,
+                'max' => $this->calculateHP()
+            ],
+            'sanity' => [
+                'current' => $this->currentSanity,
+                'max' => $this->attributes['Sanity']
+            ],
+            'level' => $this->level,
+        ];
+    }
+
     public function getState()
     {
-        $state = [
-            'attributes' => $this->attributes,
-            'level' => $this->level,
-            'currentHP' => $this->currentHP,
-            'currentFP' => $this->currentFP,
-            'currentStamina' => $this->currentStamina,
-            'currentSanity' => $this->currentSanity
-        ];
-
-        if ($this->debug) {
-            write_debug_log("Getting Character State", $state);
-        }
-
-        return $state;
+        return $this->getStats();
     }
 
     public function loadState($state)

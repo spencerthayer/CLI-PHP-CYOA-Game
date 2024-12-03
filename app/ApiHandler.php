@@ -17,17 +17,31 @@ class ApiHandler {
     
     private function processGameMechanics($narrative) {
         $stats = $this->game_state->getCharacterStats();
+        $mechanics_log = [];
         
         // Process skill checks [SKILL_CHECK:attribute:difficulty]
         $narrative = preg_replace_callback(
             '/\[SKILL_CHECK:(\w+):(\d+)\]/',
-            function($matches) use ($stats) {
-                $result = $stats->skillCheck($matches[1], intval($matches[2]));
+            function($matches) use ($stats, &$mechanics_log) {
+                $attribute = $matches[1];
+                $difficulty = intval($matches[2]);
+                $result = $stats->skillCheck($attribute, $difficulty);
+                
+                $mechanics_log[] = [
+                    'type' => 'skill_check',
+                    'attribute' => $attribute,
+                    'difficulty' => $difficulty,
+                    'roll' => $result['roll'],
+                    'modifier' => $result['modifier'] ?? 0,
+                    'total' => $result['total'],
+                    'success' => $result['success']
+                ];
+                
                 return sprintf(
                     "[%s on %s check (DC %d): %s]",
                     $result['success'] ? "SUCCESS" : "FAILURE",
-                    $matches[1],
-                    $matches[2],
+                    $attribute,
+                    $difficulty,
                     $result['details']
                 );
             },
@@ -37,13 +51,26 @@ class ApiHandler {
         // Process saving throws [SAVE:type:difficulty]
         $narrative = preg_replace_callback(
             '/\[SAVE:(\w+):(\d+)\]/',
-            function($matches) use ($stats) {
-                $result = $stats->savingThrow($matches[1], intval($matches[2]));
+            function($matches) use ($stats, &$mechanics_log) {
+                $type = $matches[1];
+                $difficulty = intval($matches[2]);
+                $result = $stats->savingThrow($type, $difficulty);
+                
+                $mechanics_log[] = [
+                    'type' => 'saving_throw',
+                    'save_type' => $type,
+                    'difficulty' => $difficulty,
+                    'roll' => $result['roll'],
+                    'modifier' => $result['modifier'] ?? 0,
+                    'total' => $result['total'],
+                    'success' => $result['success']
+                ];
+                
                 return sprintf(
                     "[%s on %s save (DC %d): %s]",
                     $result['success'] ? "SUCCESS" : "FAILURE",
-                    $matches[1],
-                    $matches[2],
+                    $type,
+                    $difficulty,
                     $result['details']
                 );
             },
@@ -53,18 +80,28 @@ class ApiHandler {
         // Process sanity checks [SANITY_CHECK:difficulty]
         $narrative = preg_replace_callback(
             '/\[SANITY_CHECK:(\d+)\]/',
-            function($matches) use ($stats) {
-                $result = $stats->sanityCheck(intval($matches[1]));
-                $message = sprintf(
-                    "[%s on Sanity check (DC %d): %s",
+            function($matches) use ($stats, &$mechanics_log) {
+                $difficulty = intval($matches[1]);
+                $result = $stats->sanityCheck($difficulty);
+                
+                $mechanics_log[] = [
+                    'type' => 'sanity_check',
+                    'difficulty' => $difficulty,
+                    'roll' => $result['roll'],
+                    'modifier' => $result['modifier'] ?? 0,
+                    'total' => $result['total'],
+                    'success' => $result['success'],
+                    'sanity_loss' => $result['sanityLoss'] ?? 0,
+                    'current_sanity' => $result['currentSanity']
+                ];
+                
+                return sprintf(
+                    "[%s on Sanity check (DC %d): %s%s]",
                     $result['success'] ? "SUCCESS" : "FAILURE",
-                    $matches[1],
-                    $result['details']
+                    $difficulty,
+                    $result['details'],
+                    !$result['success'] ? sprintf(". Lost %d Sanity points", $result['sanityLoss']) : ""
                 );
-                if (!$result['success']) {
-                    $message .= sprintf(". Lost %d Sanity points", $result['sanityLoss']);
-                }
-                return $message . "]";
             },
             $narrative
         );
@@ -72,13 +109,26 @@ class ApiHandler {
         // Process combat attacks [ATTACK:attribute:difficulty]
         $narrative = preg_replace_callback(
             '/\[ATTACK:(\w+):(\d+)\]/',
-            function($matches) use ($stats) {
-                $result = $stats->skillCheck($matches[1], intval($matches[2]));
+            function($matches) use ($stats, &$mechanics_log) {
+                $attribute = $matches[1];
+                $difficulty = intval($matches[2]);
+                $result = $stats->skillCheck($attribute, $difficulty);
+                
+                $mechanics_log[] = [
+                    'type' => 'attack',
+                    'attribute' => $attribute,
+                    'difficulty' => $difficulty,
+                    'roll' => $result['roll'],
+                    'modifier' => $result['modifier'] ?? 0,
+                    'total' => $result['total'],
+                    'success' => $result['success']
+                ];
+                
                 return sprintf(
                     "[%s on %s attack (DC %d): %s]",
                     $result['success'] ? "HIT" : "MISS",
-                    $matches[1],
-                    $matches[2],
+                    $attribute,
+                    $difficulty,
                     $result['details']
                 );
             },
@@ -88,15 +138,85 @@ class ApiHandler {
         // Process damage [DAMAGE:amount]
         $narrative = preg_replace_callback(
             '/\[DAMAGE:(\d+)\]/',
-            function($matches) use ($stats) {
+            function($matches) use ($stats, &$mechanics_log) {
                 $damage = intval($matches[1]);
-                $remainingHP = $stats->takeDamage($damage);
-                return sprintf("[Took %d damage. HP remaining: %d]", $damage, $remainingHP);
+                $old_hp = $stats->getCurrentHP();
+                $new_hp = $stats->takeDamage($damage);
+                
+                $mechanics_log[] = [
+                    'type' => 'damage',
+                    'amount' => $damage,
+                    'old_hp' => $old_hp,
+                    'new_hp' => $new_hp
+                ];
+                
+                return sprintf("[Took %d damage. HP remaining: %d]", $damage, $new_hp);
             },
             $narrative
         );
 
+        if ($this->debug && !empty($mechanics_log)) {
+            write_debug_log("Game mechanics processed", [
+                'mechanics_count' => count($mechanics_log),
+                'mechanics_details' => $mechanics_log,
+                'narrative_length_before' => strlen($narrative),
+                'narrative_length_after' => strlen($narrative)
+            ]);
+            
+            // Log the narrative context around each mechanic
+            foreach ($mechanics_log as $mechanic) {
+                $context = $this->extractNarrativeContext($narrative, $mechanic);
+                write_debug_log("Mechanic context", [
+                    'type' => $mechanic['type'],
+                    'before' => $context['before'],
+                    'result' => $context['result'],
+                    'after' => $context['after']
+                ]);
+            }
+        }
+
         return $narrative;
+    }
+
+    private function extractNarrativeContext($narrative, $mechanic) {
+        // Extract about 100 characters before and after the mechanic result
+        $pattern = '';
+        switch ($mechanic['type']) {
+            case 'skill_check':
+                $pattern = sprintf('/(.{0,100})\[(?:SUCCESS|FAILURE) on %s check \(DC %d\)[^\]]+\](.{0,100})/s',
+                    $mechanic['attribute'], $mechanic['difficulty']);
+                break;
+            case 'saving_throw':
+                $pattern = sprintf('/(.{0,100})\[(?:SUCCESS|FAILURE) on %s save \(DC %d\)[^\]]+\](.{0,100})/s',
+                    $mechanic['save_type'], $mechanic['difficulty']);
+                break;
+            case 'attack':
+                $pattern = sprintf('/(.{0,100})\[(?:HIT|MISS) on %s attack \(DC %d\)[^\]]+\](.{0,100})/s',
+                    $mechanic['attribute'], $mechanic['difficulty']);
+                break;
+            case 'sanity_check':
+                $pattern = sprintf('/(.{0,100})\[(?:SUCCESS|FAILURE) on Sanity check \(DC %d\)[^\]]+\](.{0,100})/s',
+                    $mechanic['difficulty']);
+                break;
+            case 'damage':
+                $pattern = sprintf('/(.{0,100})\[Took %d damage[^\]]+\](.{0,100})/s',
+                    $mechanic['amount']);
+                break;
+        }
+        
+        if (preg_match($pattern, $narrative, $matches)) {
+            return [
+                'before' => trim($matches[1]),
+                'result' => $mechanic,
+                'after' => trim($matches[2])
+            ];
+        }
+        
+        return [
+            'before' => '',
+            'result' => $mechanic,
+            'after' => ''
+        ];
     }
     
     public function makeApiCall($conversation) {
