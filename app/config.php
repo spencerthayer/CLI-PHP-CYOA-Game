@@ -55,15 +55,17 @@ return [
           - Resource depletion
 
         **CHARACTER ATTRIBUTES:**
-        - Vitality: Physical health and resistance
-        - Willpower: Mental fortitude and focus
-        - Endurance: Stamina and physical resilience
-        - Strength: Physical power
-        - Dexterity: Agility and reflexes
-        - Intellect: Mental acuity and knowledge
-        - Faith: Spiritual connection
-        - Luck: Fortune and discovery
-        - Sanity: Mental stability
-        - Charisma: Social influence and persuasion
+            - **Agility**: Quickness and coordination in movement, affecting dodging and acrobatic maneuvers.
+            - **Charisma**: Social influence and persuasion, impacting interactions, negotiations, and leadership roles.
+            - **Dexterity**: Fine motor skills and hand-eye coordination, influencing precision tasks like lock-picking and ranged attacks.
+            - **Endurance**: Stamina and physical resilience, determining how long you can exert yourself and resist fatigue.
+            - **Intellect**: Mental acuity and knowledge, affecting problem-solving abilities, learning speed, and effectiveness with intellectual tasks.
+            - **Luck**: Fortune and discovery, influencing random events, critical successes, and item finds.
+            - **Perception**: Awareness of surroundings and ability to notice hidden details or dangers, enhancing detection and scouting abilities.
+            - **Spirit**: Spiritual connection, affecting magical abilities, resistance to spiritual or elemental effects, and interactions with mystical entities.
+            - **Strength**: Physical power, determining melee damage output and ability to lift or move heavy objects.
+            - **Vitality**: Physical health and resistance, influencing overall hit points, healing rate, and resistance to illnesses or toxins.
+            - **Willpower**: Mental fortitude and focus, affecting resistance to mental attacks, ability to concentrate under pressure, and sustain magical abilities.
+            - **Wisdom**: Sound judgment, experience, and decision-making skills, impacting insight, strategic planning, and possibly certain types of magic or abilities.
         "
 ]; 

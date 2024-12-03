@@ -29,7 +29,7 @@ class ApiHandler {
                 $difficulty = intval($matches[2]);
                 
                 // Handle different types of checks
-                if (in_array($attribute, ['Strength', 'Dexterity', 'Vitality', 'Intellect', 'Willpower', 'Faith', 'Luck', 'Charisma'])) {
+                if (in_array($attribute, ['Agility', 'Appearance', 'Charisma', 'Dexterity', 'Endurance', 'Intellect', 'Knowledge', 'Luck', 'Perception', 'Spirit', 'Strength', 'Vitality', 'Willpower', 'Wisdom'])) {
                     $result = $stats->skillCheck($attribute, $difficulty);
                     $roll_text = sprintf(
                         "\n🎲 %s Check: %d + %d (modifier) = %d vs DC %d - %s!\n",
@@ -223,7 +223,7 @@ class ApiHandler {
                     write_debug_log("🎲 Saving Throw Result", [
                         'type' => 'saving_throw',
                         'save_type' => $type,
-                        'roll_result' => $result['details'],
+                        'roll_result' => $result,
                         'success' => $result['success']
                     ]);
                 }
@@ -256,7 +256,7 @@ class ApiHandler {
                     write_debug_log("🎲 Skill Check Result", [
                         'type' => 'skill_check',
                         'attribute' => $attribute,
-                        'roll_result' => $result['details'],
+                        'roll_result' => $result,
                         'success' => $result['success']
                     ]);
                 }
@@ -426,7 +426,7 @@ class ApiHandler {
             $stats = $this->game_state->getCharacterStats();
             
             // Handle different types of checks
-            if (in_array($attribute, ['Strength', 'Dexterity', 'Vitality', 'Intellect', 'Willpower', 'Faith', 'Luck', 'Charisma'])) {
+            if (in_array($attribute, ['Agility', 'Appearance', 'Charisma', 'Dexterity', 'Endurance', 'Intellect', 'Knowledge', 'Luck', 'Perception', 'Spirit', 'Strength', 'Vitality', 'Willpower', 'Wisdom'])) {
                 $check_result = $stats->skillCheck($attribute, $difficulty);
             } else {
                 $check_result = $stats->savingThrow($attribute, $difficulty);
@@ -445,7 +445,8 @@ class ApiHandler {
         }
 
         // Get current stats for the system message
-        $current_stats = $this->game_state->getCharacterStats()->getStats();
+        $stats = $this->game_state->getCharacterStats();
+        $current_stats = $stats->getStats();
         
         $data = [
             'model' => $this->config['api']['model'],
@@ -454,21 +455,28 @@ class ApiHandler {
                     [
                         'role' => 'system',
                         'content' => "You are narrating a dark fantasy RPG game. Provide immersive narrative descriptions but DO NOT include the options list in the narrative - options will be displayed separately. The player's current stats are:\n" .
-                            "Strength: " . $current_stats['attributes']['Strength']['current'] . " (modifier: " . floor(($current_stats['attributes']['Strength']['current'] - 10) / 2) . ")\n" .
-                            "Dexterity: " . $current_stats['attributes']['Dexterity']['current'] . " (modifier: " . floor(($current_stats['attributes']['Dexterity']['current'] - 10) / 2) . ")\n" .
-                            "Vitality: " . $current_stats['attributes']['Vitality']['current'] . " (modifier: " . floor(($current_stats['attributes']['Vitality']['current'] - 10) / 2) . ")\n" .
-                            "Intellect: " . $current_stats['attributes']['Intellect']['current'] . " (modifier: " . floor(($current_stats['attributes']['Intellect']['current'] - 10) / 2) . ")\n" .
-                            "Willpower: " . $current_stats['attributes']['Willpower']['current'] . " (modifier: " . floor(($current_stats['attributes']['Willpower']['current'] - 10) / 2) . ")\n" .
-                            "Faith: " . $current_stats['attributes']['Faith']['current'] . " (modifier: " . floor(($current_stats['attributes']['Faith']['current'] - 10) / 2) . ")\n" .
-                            "Luck: " . $current_stats['attributes']['Luck']['current'] . " (modifier: " . floor(($current_stats['attributes']['Luck']['current'] - 10) / 2) . ")\n" .
-                            "Endurance: " . $current_stats['attributes']['Endurance']['current'] . " (modifier: " . floor(($current_stats['attributes']['Endurance']['current'] - 10) / 2) . ")\n" .
-                            "\nDerived Stats:\n" .
-                            "Health: " . $current_stats['attributes']['Health']['current'] . "/" . $current_stats['attributes']['Health']['max'] . "\n" .
-                            "Focus: " . $current_stats['attributes']['Focus']['current'] . "/" . $current_stats['attributes']['Focus']['max'] . "\n" .
-                            "Stamina: " . $current_stats['attributes']['Stamina']['current'] . "/" . $current_stats['attributes']['Stamina']['max'] . "\n" .
-                            "Sanity: " . $current_stats['attributes']['Sanity']['current'] . "/" . $current_stats['attributes']['Sanity']['max'] . "\n" .
-                            "\nLevel: " . $current_stats['level'] . "\n" .
-                            "Experience: " . $current_stats['experience'] . "\n"
+                            "Primary Attributes:\n" .
+                            "Agility: " . $stats->getStat('Agility')['current'] . " (modifier: " . floor(($stats->getStat('Agility')['current'] - 10) / 2) . ")\n" .
+                            "Appearance: " . $stats->getStat('Appearance')['current'] . " (modifier: " . floor(($stats->getStat('Appearance')['current'] - 10) / 2) . ")\n" .
+                            "Charisma: " . $stats->getStat('Charisma')['current'] . " (modifier: " . floor(($stats->getStat('Charisma')['current'] - 10) / 2) . ")\n" .
+                            "Dexterity: " . $stats->getStat('Dexterity')['current'] . " (modifier: " . floor(($stats->getStat('Dexterity')['current'] - 10) / 2) . ")\n" .
+                            "Endurance: " . $stats->getStat('Endurance')['current'] . " (modifier: " . floor(($stats->getStat('Endurance')['current'] - 10) / 2) . ")\n" .
+                            "Intellect: " . $stats->getStat('Intellect')['current'] . " (modifier: " . floor(($stats->getStat('Intellect')['current'] - 10) / 2) . ")\n" .
+                            "Knowledge: " . $stats->getStat('Knowledge')['current'] . " (modifier: " . floor(($stats->getStat('Knowledge')['current'] - 10) / 2) . ")\n" .
+                            "Luck: " . $stats->getStat('Luck')['current'] . " (modifier: " . floor(($stats->getStat('Luck')['current'] - 10) / 2) . ")\n" .
+                            "Perception: " . $stats->getStat('Perception')['current'] . " (modifier: " . floor(($stats->getStat('Perception')['current'] - 10) / 2) . ")\n" .
+                            "Spirit: " . $stats->getStat('Spirit')['current'] . " (modifier: " . floor(($stats->getStat('Spirit')['current'] - 10) / 2) . ")\n" .
+                            "Strength: " . $stats->getStat('Strength')['current'] . " (modifier: " . floor(($stats->getStat('Strength')['current'] - 10) / 2) . ")\n" .
+                            "Vitality: " . $stats->getStat('Vitality')['current'] . " (modifier: " . floor(($stats->getStat('Vitality')['current'] - 10) / 2) . ")\n" .
+                            "Willpower: " . $stats->getStat('Willpower')['current'] . " (modifier: " . floor(($stats->getStat('Willpower')['current'] - 10) / 2) . ")\n" .
+                            "Wisdom: " . $stats->getStat('Wisdom')['current'] . " (modifier: " . floor(($stats->getStat('Wisdom')['current'] - 10) / 2) . ")\n\n" .
+                            "Derived Stats:\n" .
+                            "Health: " . $stats->getStat('Health')['current'] . "/" . $stats->getStat('Health')['max'] . "\n" .
+                            "Focus: " . $stats->getStat('Focus')['current'] . "/" . $stats->getStat('Focus')['max'] . "\n" .
+                            "Stamina: " . $stats->getStat('Stamina')['current'] . "/" . $stats->getStat('Stamina')['max'] . "\n" .
+                            "Sanity: " . $stats->getStat('Sanity')['current'] . "/" . $stats->getStat('Sanity')['max'] . "\n" .
+                            "\nLevel: " . $stats->getLevel() . "\n" .
+                            "Experience: " . $stats->getExperience() . "\n"
                     ]
                 ],
                 $conversation
@@ -476,7 +484,7 @@ class ApiHandler {
             'functions' => [
                 [
                     'name' => 'GameResponse',
-                    'description' => 'Response from the game, containing narrative description and available options. The narrative should be immersive but should NOT include the options list - options will be displayed separately.',
+                    'description' => 'Response from the game, containing narrative description and available options. The narrative should be immersive but should NOT include the options list in the narrative - options will be displayed separately.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [

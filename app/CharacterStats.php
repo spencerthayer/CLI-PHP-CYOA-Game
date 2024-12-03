@@ -7,21 +7,26 @@ class CharacterStats
     // Base Attributes with consistent structure
     private $attributes = [
         // Primary Attributes
-        'Strength' => ['current' => 10, 'max' => 10],
-        'Dexterity' => ['current' => 10, 'max' => 10],
-        'Vitality' => ['current' => 10, 'max' => 10],
-        'Intellect' => ['current' => 10, 'max' => 10],
-        'Willpower' => ['current' => 10, 'max' => 10],
-        'Faith' => ['current' => 10, 'max' => 10],
-        'Luck' => ['current' => 10, 'max' => 10],
-        'Endurance' => ['current' => 10, 'max' => 10],
-        'Charisma' => ['current' => 10, 'max' => 10],
+        'Agility'    => ['current' => 10, 'max' => 20],
+        'Appearance' => ['current' => 10, 'max' => 20],
+        'Charisma'   => ['current' => 10, 'max' => 20],
+        'Dexterity'  => ['current' => 10, 'max' => 20],
+        'Endurance'  => ['current' => 10, 'max' => 20],
+        'Intellect'  => ['current' => 10, 'max' => 20],
+        'Knowledge'  => ['current' => 10, 'max' => 20],
+        'Luck'       => ['current' => 10, 'max' => 20],
+        'Perception' => ['current' => 10, 'max' => 20],
+        'Spirit'     => ['current' => 10, 'max' => 20],
+        'Strength'   => ['current' => 10, 'max' => 20],
+        'Vitality'   => ['current' => 10, 'max' => 20],
+        'Willpower'  => ['current' => 10, 'max' => 20],
+        'Wisdom'     => ['current' => 10, 'max' => 20],
         
         // Derived Stats - these will be calculated in initializeStats()
-        'Health' => ['current' => 0, 'max' => 0],
-        'Focus' => ['current' => 0, 'max' => 0],
-        'Stamina' => ['current' => 0, 'max' => 0],
-        'Sanity' => ['current' => 0, 'max' => 0]
+        'Focus'   => ['current' => 0, 'max' => 0],
+        'Health'  => ['current' => 0, 'max' => 0],
+        'Sanity'  => ['current' => 0, 'max' => 0],
+        'Stamina' => ['current' => 0, 'max' => 0]
     ];
 
     private $level = 1;
@@ -411,7 +416,7 @@ class CharacterStats
     private function onLevelUp()
     {
         // Increase primary attributes
-        $primaryAttributes = ['Strength', 'Dexterity', 'Vitality', 'Intellect', 'Willpower', 'Faith', 'Luck', 'Endurance', 'Charisma'];
+        $primaryAttributes = ['Agility', 'Appearance', 'Charisma', 'Dexterity', 'Endurance', 'Intellect', 'Knowledge', 'Luck', 'Perception', 'Spirit', 'Strength', 'Vitality', 'Willpower', 'Wisdom'];
         foreach ($primaryAttributes as $attr) {
             if (rand(1, 100) <= 30) { // 30% chance to increase each attribute
                 $this->attributes[$attr]['max'] += 1;
