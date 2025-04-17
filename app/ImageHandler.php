@@ -49,6 +49,9 @@ class ImageHandler {
             return null;
         }
         
+        // Sanitize prompt: remove newlines before URL encoding
+        $prompt = str_replace(["\n", "\r"], ' ', $prompt); // Replace newlines with spaces
+        
         $prompt_url = urlencode("8bit ANSI video game $prompt");
         $url = "https://image.pollinations.ai/prompt/$prompt_url?nologo=true&width=360&height=160&seed=$timestamp&model=flux";
         write_debug_log("Requesting image from URL", ['url' => $url]);
@@ -58,13 +61,19 @@ class ImageHandler {
         }
         
         $loading_pid = Utils::showLoadingAnimation();
-        $image_data = @file_get_contents($url);
+        
+        // Set context options for timeout
+        $context = stream_context_create(['http' => ['timeout' => 15]]); // 15 second timeout
+        
+        // Use error suppression and check the result with context
+        $image_data = @file_get_contents($url, false, $context);
         Utils::stopLoadingAnimation($loading_pid);
         
         if ($image_data === false) {
             $error = error_get_last();
-            write_debug_log("Failed to fetch image", ['error' => $error['message'] ?? 'Unknown error']);
-            echo "Error downloading image from Pollinations.ai: " . ($error['message'] ?? 'Unknown error') . "\n";
+            $error_message = $error['message'] ?? 'Unknown error';
+            write_debug_log("Failed to fetch image", ['error' => $error_message]);
+            echo Utils::colorize("[yellow]Warning: Could not download image from Pollinations.ai ($error_message). Skipping image display.[/yellow]\n");
             return null;
         }
         
@@ -101,10 +110,26 @@ class ImageHandler {
                 urlencode("8bit pixel art game title screen for The Dying Earth, dark fantasy RPG game") . 
                 "?nologo=true&width=360&height=160&seed=123&model=flux";
             
-            $image_data = file_get_contents($title_url);
+            write_debug_log("Requesting title screen image from URL", ['url' => $title_url]);
+            
+            // Set context options for timeout
+            $context = stream_context_create(['http' => ['timeout' => 15]]); // 15 second timeout
+            
+            // Use error suppression and check the result with context
+            $image_data = @file_get_contents($title_url, false, $context);
             
             if ($image_data !== false) {
-                file_put_contents($title_image_path, $image_data);
+                if (!@file_put_contents($title_image_path, $image_data)) {
+                    write_debug_log("Failed to save title screen image");
+                    echo Utils::colorize("[yellow]Warning: Failed to save title screen image.[/yellow]\n");
+                    return null; // Explicitly return null on save failure
+                }
+            } else {
+                $error = error_get_last();
+                $error_message = $error['message'] ?? 'Network error or timeout'; // Improved default message
+                write_debug_log("Failed to fetch title screen image", ['error' => $error_message]);
+                echo Utils::colorize("[yellow]Warning: Could not download title screen image ($error_message).[/yellow]\n");
+                return null; // Explicitly return null on fetch failure
             }
         }
         

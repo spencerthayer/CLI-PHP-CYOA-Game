@@ -1,4 +1,4 @@
-<?php
+g<?php
 
 namespace App;
 
@@ -70,6 +70,12 @@ class GameState {
                 'mechanics_count' => count($this->mechanics_history),
                 'character_stats' => $state['character_stats']
             ]);
+        }
+        
+        $save_file_path = $this->config['paths']['game_history_file'];
+        $data_dir = dirname($save_file_path);
+        if (!is_dir($data_dir)) {
+            mkdir($data_dir, 0755, true);
         }
         
         // Save with pretty printing for better readability

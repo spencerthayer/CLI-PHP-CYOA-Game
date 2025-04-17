@@ -1,5 +1,9 @@
 <?php
 
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 // Ensure readline is available and initialized
 if (!extension_loaded('readline')) {
     die("The readline extension is required for this game. Please install it first.\n");
@@ -37,6 +41,11 @@ $debug = in_array('--debug', $argv);
 
 // Function to get the API key
 function get_api_key($api_key_file) {
+    $data_dir = dirname($api_key_file);
+    if (!is_dir($data_dir)) {
+        mkdir($data_dir, 0755, true);
+    }
+
     if (file_exists($api_key_file)) {
         $api_key = trim(file_get_contents($api_key_file));
         if (!empty($api_key)) {
@@ -78,6 +87,20 @@ $config = require __DIR__ . '/app/config.php';
 // Ensure images directory exists
 if (!is_dir($config['paths']['images_dir'])) {
     mkdir($config['paths']['images_dir'], 0755, true);
+}
+
+// Ensure data directory exists for other files
+$data_dir_paths = [
+    $config['paths']['game_history_file'],
+    $config['paths']['user_prefs_file'],
+    $config['paths']['debug_log_file']
+];
+foreach ($data_dir_paths as $file_path) {
+    $data_dir = dirname($file_path);
+    if (!is_dir($data_dir)) {
+        mkdir($data_dir, 0755, true);
+        break; // Only need to create it once
+    }
 }
 
 // Initialize components
@@ -270,11 +293,12 @@ while (true) {
             case 'g':
                 $generate_image_toggle = !$generate_image_toggle;
                 echo Utils::colorize("\n[green]Image generation is now " . ($generate_image_toggle ? "enabled" : "disabled") . ".[/green]\n");
-                // Redisplay the current scene
-                if ($scene_data) {
+                // Only redisplay the scene if turning images ON
+                if ($generate_image_toggle && $scene_data) {
                     displayScene($scene_data, $generate_image_toggle, $imageHandler);
                 }
-                continue 2;
+                // If turning off, just continue to show the menu again without full scene refresh
+                continue 2; // Always continue to redisplay menu
                 
             case 't':
                 $custom_action = readline(Utils::colorize("\n[cyan]Type your action: [/cyan]"));
@@ -300,6 +324,7 @@ while (true) {
                 
             case 's':
                 displayCharacterSheet($gameState);
+                // Don't redisplay scene, just show menu again
                 continue 2;
                 
             default:
@@ -567,34 +592,37 @@ function displayScene($scene_data, $generate_image_toggle = true, $imageHandler 
 
     // Get the appropriate options based on the last check result
     $options = [];
+    $last_check = null;
+
     if (isset($scene_data->options->success) && isset($scene_data->options->failure)) {
         global $gameState;
-        $conversation = $gameState->getConversation();
-        $last_message = end($conversation);
-        if ($last_message && $last_message['role'] === 'assistant') {
-            $last_check = $gameState->getLastCheckResult();
-            if ($last_check) {
-                $options = $last_check['success'] ? $scene_data->options->success : $scene_data->options->failure;
-                // Clear the check result after using it
-                $gameState->clearLastCheckResult();
-            } else {
-                // If no check result, use success options as default
-                $options = $scene_data->options->success;
-            }
+        $last_check = $gameState->getLastCheckResult();
+
+        if ($last_check) {
+            $options = $last_check['success'] ? $scene_data->options->success : $scene_data->options->failure;
         } else {
+            // If no check result is stored, but we expect one (e.g., options are structured), 
+            // default to failure options maybe? Or log a warning? Let's assume success for now, but this might need review.
+            write_debug_log("Warning: Expected last check result, but none found. Defaulting to success options.", ['scene_data' => $scene_data]);
             $options = $scene_data->options->success;
         }
     } else if (is_array($scene_data->options)) {
-        // Handle legacy format where options is a simple array
+        // Handle legacy format where options is a simple array or if there was no check expected
         $options = $scene_data->options;
     } else {
         // Fallback to empty array if no valid options found
+        write_debug_log("Warning: No valid options found in scene data.", ['scene_data' => $scene_data]);
         $options = [];
     }
 
     foreach ($options as $index => $option) {
         $number = $index + 1;
         echo Utils::colorize("[cyan]{$number}. {$option}[/cyan]\n");
+    }
+    
+    // Clear the check result AFTER displaying the scene based on it
+    if ($last_check) {
+        $gameState->clearLastCheckResult();
     }
 }
 
