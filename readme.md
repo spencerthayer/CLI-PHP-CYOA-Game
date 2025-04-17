@@ -10,6 +10,7 @@ Welcome to **The Quest of the Forgotten Realm**, an interactive text-based adven
   - [Starting the Game](#starting-the-game)
   - [Command-Line Options](#command-line-options)
 - [Gameplay Instructions](#gameplay-instructions)
+- [Character Stats Explained](#character-stats-explained)
 - [Security Considerations](#security-considerations)
 - [Troubleshooting](#troubleshooting)
 - [Customization](#customization)
@@ -68,10 +69,12 @@ Before you begin, ensure you have met the following requirements:
      php -m | grep -E 'curl|gd'
      ```
    - If not installed, refer to your operating system's package manager or PHP installation guide to add these extensions.
+   - Ensure the `readline` extension is enabled for interactive input. Check with `php -m | grep readline`.
 
 4. **Create Necessary Directories**
 
    The game will automatically create an `images` directory for temporary image storage. Ensure the PHP process has permissions to create directories in the project path.
+   - The game also uses a `data` directory to store the API key, game history, and debug logs. Ensure the PHP process has write permissions in the project's root directory to create this if it doesn't exist.
 
 ---
 
@@ -94,7 +97,7 @@ php game.php
   ```
 
   - Paste your API key and press **Enter**.
-  - The API key will be saved securely in a hidden file named `.openai_api_key` with permissions set to `0600` (readable and writable only by you).
+  - The API key will be saved securely in a hidden file named `data/.openai_api_key` with permissions set to `0600` (readable and writable only by you).
 
 **Subsequent Runs:**
 
@@ -120,7 +123,7 @@ php game.php
   php game.php --debug
   ```
 
-  - This will display internal processing messages, helpful for troubleshooting or understanding the game's operations.
+  - This will display internal processing messages in the console and write detailed logs to `data/debug_log.txt`, helpful for troubleshooting or understanding the game's operations.
 
 - **Combine Flags**
 
@@ -151,6 +154,15 @@ php game.php
 
   When prompted with `Your choice (1-4, or 'exit'):`, enter the number corresponding to your desired action and press **Enter**.
 
+  - Some choices may involve hidden **skill checks**, **saving throws**, or **sanity checks** based on your character's stats. The outcome of these checks (Success/Failure) might alter the available options or narrative results.
+
+  - **Other Commands:**
+    - `t`: Type in a custom action instead of choosing a numbered option.
+    - `s`: Display your character sheet, showing stats and attributes.
+    - `g`: Toggle the generation of ASCII art images for scenes (On/Off).
+    - `n`: Start a new game (you will be asked for confirmation).
+    - `q` or `quit`: Exit the game.
+
   - **Example:**
     ```
     [cyan]Your choice (1-4, or 'exit'): [/cyan] 2
@@ -162,11 +174,68 @@ php game.php
 
 ---
 
+## Character Stats Explained
+
+Your character possesses a set of attributes that influence their capabilities and resilience within the game world. These are divided into Primary Attributes and Derived Stats.
+
+### Primary Attributes
+
+These 14 core attributes are randomly determined at the start of a new game (typically between 8 and 18) and represent your character's innate abilities:
+
+*   **Agility:** Physical dexterity, speed, and reflexes.
+*   **Appearance:** Physical attractiveness and grooming.
+*   **Charisma:** Social grace, likability, and leadership potential.
+*   **Dexterity:** Hand-eye coordination, fine motor skills, and nimbleness.
+*   **Endurance:** Physical stamina, resilience to fatigue and pain.
+*   **Intellect:** Reasoning ability, memory, and problem-solving skills.
+*   **Knowledge:** Learned information and expertise.
+*   **Luck:** Innate fortune and chance.
+*   **Perception:** Awareness of surroundings, ability to notice details.
+*   **Spirit:** Inner strength, morale, and connection to mystical forces.
+*   **Strength:** Physical power and brute force.
+*   **Vitality:** Overall health, constitution, and resistance to disease/poison.
+*   **Willpower:** Mental fortitude, self-control, and determination.
+*   **Wisdom:** Intuition, common sense, and insight.
+
+Each Primary Attribute score provides a **Modifier**, calculated as `floor((Score - 10) / 2)`. This modifier is added to relevant dice rolls (d20) during Skill Checks and Saving Throws.
+
+### Derived Stats
+
+These stats are calculated based on your Primary Attributes and represent your character's resources and current state:
+
+*   **Health:** Hit points; resistance to physical damage. Influenced by `Vitality` and `Endurance`.
+    *   *Formula: floor((Vitality * 2) + Endurance)*
+*   **Focus:** Mental energy for special abilities or concentration. Influenced by `Willpower`, `Intellect`, and `Wisdom`.
+    *   *Formula: floor(Willpower + ((Intellect + Wisdom) / 2))* 
+*   **Stamina:** Physical energy for strenuous actions. Influenced by `Endurance`, `Strength`, and `Agility`.
+    *   *Formula: floor((Endurance * 1.5) + ((Strength + Agility) / 2))*
+*   **Courage:** Resistance to fear and intimidation. Influenced by `Willpower`, `Spirit`, and `Charisma`.
+    *   *Formula: floor(Willpower + ((Spirit + Charisma) / 2))*
+*   **Sanity:** Mental stability and resistance to psychological stress. Influenced by `Willpower`, `Intellect`, and `Perception`.
+    *   *Formula: floor((Willpower * 1.5) + ((Intellect + Perception) / 2))*
+
+### Skill Checks, Saving Throws, and Sanity Checks
+
+Many actions you attempt or situations you encounter will trigger a check or save:
+
+*   **Skill Check:** When attempting an action requiring a specific ability (e.g., climbing a wall using Strength), you roll a d20, add the relevant attribute's modifier (and potentially a proficiency bonus), and compare it to a Difficulty Class (DC). *Format: `[SKILL_CHECK:Attribute:DC]`*
+*   **Saving Throw:** When resisting an external effect (e.g., dodging a trap using Dexterity), you roll a d20, add the relevant attribute's modifier, and compare it to a DC. Specific saves use fixed attributes:
+    *   Fortitude: `Vitality`
+    *   Reflex: `Dexterity`
+    *   Will: `Willpower`
+    *   Social: `Charisma`
+    *   *Format: `[SAVE:SaveType:DC]`*
+*   **Sanity Check:** A special check against mental strain, rolling d20 plus your Sanity modifier against a DC. Failing can result in a loss of Sanity points. *Format: `[SANITY_CHECK:DC]`*
+
+Success or failure in these rolls determines the outcome of your actions and how the narrative progresses.
+
+---
+
 ## Security Considerations
 
 - **API Key Storage**
 
-  - Your OpenAI API key is stored in a hidden file named `.openai_api_key` in the project directory.
+  - Your OpenAI API key is stored in a hidden file named `data/.openai_api_key` in the project directory.
   - The file permissions are set to `0600`, making it readable and writable only by your user account.
   - **Do Not Share:** Never share your API key or commit it to any public repository.
 
@@ -226,31 +295,38 @@ php game.php
 
 - **Changing the Game Theme**
 
-  - Open `game.php` in a text editor.
-  - Locate the `$system_prompt` variable.
-  - Modify the prompt to change the game's setting or rules.
+  - Open `app/config.php` in a text editor.
+  - Modify the `system_prompt` key within the returned array to change the game's setting or rules.
     ```php
-    $system_prompt = "You are an interactive sci-fi adventure game set in space...";
+    'system_prompt' => "You are an interactive sci-fi adventure game set in space...",
     ```
 
 - **Adjusting API Parameters**
 
-  - Modify parameters like `temperature` in the `$data` array to change response creativity.
+  - In `app/config.php`, modify parameters like `temperature` under the `api` key to change response creativity.
     ```php
-    'temperature' => 0.9,
+    'api' => [
+        // ... other settings
+        'temperature' => 0.9,
+        // ...
+    ],
     ```
 
 - **Using a Different Model**
 
-  - If you have access to GPT-4, you can change the model:
+  - In `app/config.php`, change the `model` under the `api` key:
     ```php
-    'model' => 'gpt-4',
+    'api' => [
+        // ... other settings
+        'model' => 'gpt-4', // Or another available model
+        // ...
+    ],
     ```
 
 - **Enhancing ASCII Art Quality**
 
-  - Adjust the `$scale` variable in `ascii_art_converter.php` to change the resolution of the ASCII art.
-  - Experiment with different character sets to improve shading and detail.
+  - Adjust the `scale` parameter under the `image` key in `app/config.php` to change the resolution of the ASCII art.
+  - You can also experiment with different character sets in `app/AsciiArtConverter.php`.
 
 ---
 
