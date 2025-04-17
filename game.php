@@ -35,6 +35,7 @@ use App\GameState;
 use App\ImageHandler;
 use App\ApiHandler;
 use App\Utils;
+use App\AudioHandler;
 
 // Check if debug mode is enabled
 $debug = in_array('--debug', $argv);
@@ -110,11 +111,15 @@ write_debug_log("GameState initialized", ['config' => $config, 'debug' => $debug
 $imageHandler = new ImageHandler($config, $debug);
 write_debug_log("ImageHandler initialized");
 
+$audioHandler = new AudioHandler($config, $debug);
+write_debug_log("AudioHandler initialized");
+
 $apiHandler = new ApiHandler($config, get_api_key($config['paths']['api_key_file']), $gameState, $debug);
 write_debug_log("ApiHandler initialized with CharacterStats integration");
 
 // Initialize game variables
 $generate_image_toggle = $config['game']['generate_image_toggle'] ?? true;
+$generate_audio_toggle = $config['game']['audio_toggle'] ?? true;
 $should_make_api_call = false;
 $last_user_input = '';
 $scene_data = null;
@@ -154,7 +159,7 @@ function validateApiCall($conversation, $user_input) {
         return false;
     }
 
-    if (in_array(strtolower($user_input), ['t', 'g', 'n', 'q', 's'])) {
+    if (in_array(strtolower($user_input), ['t', 'i', 'n', 'q', 's', 'a'])) {
         return false;
     }
 
@@ -234,9 +239,9 @@ while (true) {
     try {
         // Display the current scene and menu
         if ($scene_data) {
-            displayScene($scene_data, $generate_image_toggle, $imageHandler);
+            displayScene($scene_data, $generate_image_toggle, $imageHandler, $generate_audio_toggle, $audioHandler);
         }
-        displayGameMenu($generate_image_toggle);
+        displayGameMenu($generate_image_toggle, $generate_audio_toggle);
         
         // Get user input using readline
         $user_input = readline(Utils::colorize("\n[cyan]Your choice: [/cyan]"));
@@ -290,15 +295,21 @@ while (true) {
                 }
                 break;
                 
-            case 'g':
+            case 'i':
                 $generate_image_toggle = !$generate_image_toggle;
                 echo Utils::colorize("\n[green]Image generation is now " . ($generate_image_toggle ? "enabled" : "disabled") . ".[/green]\n");
                 // Only redisplay the scene if turning images ON
                 if ($generate_image_toggle && $scene_data) {
-                    displayScene($scene_data, $generate_image_toggle, $imageHandler);
+                    displayScene($scene_data, $generate_image_toggle, $imageHandler, $generate_audio_toggle, $audioHandler);
                 }
                 // If turning off, just continue to show the menu again without full scene refresh
                 continue 2; // Always continue to redisplay menu
+                
+            case 'a':
+                $generate_audio_toggle = !$generate_audio_toggle;
+                echo Utils::colorize("\n[green]Audio generation is now " . ($generate_audio_toggle ? "enabled" : "disabled") . ".[/green]\n");
+                // Don't redisplay scene or audio, just show menu again
+                continue 2;
                 
             case 't':
                 $custom_action = readline(Utils::colorize("\n[cyan]Type your action: [/cyan]"));
@@ -429,7 +440,7 @@ while (true) {
                     $gameState->addMessage('user', $chosen_option);
                     $should_make_api_call = true;
                 } else {
-                    echo Utils::colorize("\n[red]Invalid choice. Please enter a number between 1-4 or use one of the menu options (t/g/q/n/s).[/red]\n");
+                    echo Utils::colorize("\n[red]Invalid choice. Please enter a number between 1-4 or use one of the menu options (t/i/q/n/s).[/red]\n");
                     continue 2;
                 }
                 break;
@@ -484,13 +495,15 @@ while (true) {
 }
 
 // Function to display the game menu
-function displayGameMenu($generate_image_toggle) {
+function displayGameMenu($generate_image_toggle, $generate_audio_toggle) {
     echo "\n";
     echo Utils::colorize("[green](t) Type in your own action[/green]");
     echo " | ";
     echo Utils::colorize("[green](s) Character Sheet[/green]");
     echo " | ";
-    echo Utils::colorize("[green](g) Generate Images (" . ($generate_image_toggle ? "On" : "Off") . ")[/green]");
+    echo Utils::colorize("[green](i) Generate Images (" . ($generate_image_toggle ? "On" : "Off") . ")[/green]");
+    echo " | ";
+    echo Utils::colorize("[green](a) Generate Audio (" . ($generate_audio_toggle ? "On" : "Off") . ")[/green]");
     echo " | ";
     echo Utils::colorize("[green](q) Quit the game[/green]");
     echo " | ";
@@ -560,11 +573,12 @@ function displayCharacterSheet($gameState) {
 }
 
 // Function to display scene
-function displayScene($scene_data, $generate_image_toggle = true, $imageHandler = null) {
+function displayScene($scene_data, $generate_image_toggle = true, $imageHandler = null, $generate_audio_toggle = true, $audioHandler = null) {
     if (!isset($scene_data->narrative)) {
         return;
     }
 
+    // Display image first (if enabled)
     if ($generate_image_toggle && $imageHandler) {
         // Try to display existing image first
         $ascii_art = null;
@@ -586,8 +600,22 @@ function displayScene($scene_data, $generate_image_toggle = true, $imageHandler 
         }
     }
     
+    // Display narrative text
     $narrative = Utils::wrapText($scene_data->narrative);
     echo "\n" . Utils::colorize($narrative) . "\n\n";
+
+    // Then speak narrative (if enabled)
+    if ($generate_audio_toggle && $audioHandler && isset($scene_data->narrative)) {
+        global $debug;
+        if ($debug) {
+            write_debug_log("Attempting to speak narrative");
+        }
+        // Strip ANSI codes before sending to audio, just like wrapText does for display
+        $text_for_audio = preg_replace('/\\x1b\\[[0-9;]*m/', '', $scene_data->narrative);
+        $audioHandler->speakNarrative($text_for_audio);
+    }
+
+    // Display options
     echo Utils::colorize("\n[bold]Choose your next action:[/bold]\n");
 
     // Get the appropriate options based on the last check result

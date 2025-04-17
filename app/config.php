@@ -7,6 +7,7 @@ return [
         'user_prefs_file' => __DIR__ . '/../.data/.user_prefs',
         'debug_log_file' => __DIR__ . '/../.data/.debug_log',
         'images_dir' => __DIR__ . '/../images',
+        'tmp_dir' => __DIR__ . '/../tmp',
     ],
     
     'api' => [
@@ -14,13 +15,19 @@ return [
         'chat_url' => 'https://api.openai.com/v1/chat/completions',
         'max_tokens' => 1000,
         'temperature' => 0.8,
-        'max_image_description_length' => 128
+        'max_image_description_length' => 128,
     ],
     
     'game' => [
         'max_iterations' => 1000,
         'max_custom_action_length' => 500,
-        'generate_image_toggle' => false
+        'generate_image_toggle' => true,
+        'audio_toggle' => true,
+    ],
+    
+    'audio' => [
+        'voice' => 'ash',
+        'model' => 'openai-audio',
     ],
     
     'weights' => [

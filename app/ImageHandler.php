@@ -101,7 +101,7 @@ class ImageHandler {
         }
     }
     
-    public function generateTitleScreen() {
+    public function generate1Screen() {
         $title_image_path = $this->config['paths']['images_dir'] . '/static_title.png';
         
         // Generate title image if it doesn't exist
