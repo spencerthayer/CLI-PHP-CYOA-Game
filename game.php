@@ -152,6 +152,7 @@ if (in_array('--new', $argv)) {
     }
     
     $imageHandler->clearImages();
+    $audioHandler->clearAudioFiles();
     $gameState = new GameState($config);
     $gameState->addMessage('system', $config['system_prompt']);
     $gameState->addMessage('user', 'start game');
@@ -290,6 +291,8 @@ while (true) {
                         echo $title_screen . "\n";
                     }
                     
+                    $imageHandler->clearImages();
+                    $audioHandler->clearAudioFiles();
                     $gameState = new GameState($config, $debug);
                     $gameState->addMessage('system', $config['system_prompt']);
                     $gameState->addMessage('user', 'start game');

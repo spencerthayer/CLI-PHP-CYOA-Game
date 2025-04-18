@@ -170,4 +170,19 @@ class AudioHandler {
         $this->write_debug_log("Testing TTS GET endpoint");
         $this->speakNarrative("This is a quick test of Pollinations.AI text to speech.");
     }
+
+    /**
+     * Remove all temporary audio files from the speech directory
+     */
+    public function clearAudioFiles() {
+        $this->write_debug_log("Clearing temporary audio files");
+        $files = glob($this->tmp_dir . '/speech_*.mp3');
+        $this->write_debug_log("Found temporary audio files", ['count' => count($files)]);
+        foreach ($files as $file) {
+            if (is_file($file)) {
+                $this->write_debug_log("Deleting temporary audio file", ['file' => $file]);
+                unlink($file);
+            }
+        }
+    }
 } 
