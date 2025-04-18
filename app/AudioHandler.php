@@ -8,8 +8,6 @@ class AudioHandler {
     private $config;
     private $debug;
     private $tmp_dir;
-    private $max_text_length = 5120;
-    private $voice = 'ash';
 
     public function __construct($config, $debug = false) {
         $this->config = $config;
@@ -65,14 +63,14 @@ class AudioHandler {
     }
 
     private function splitTextIntoChunks(string $txt): array {
-        if (strlen($txt) <= $this->max_text_length) {
+        if (strlen($txt) <= $this->config['audio']['max_text_length']) {
             return [$txt];
         }
         $chunks = [];
         $sentences = preg_split('/(?<=[.!?])\s+/', $txt, -1, PREG_SPLIT_NO_EMPTY);
         $cur = '';
         foreach ($sentences as $s) {
-            if (strlen($cur) + strlen($s) + 1 > $this->max_text_length) {
+            if (strlen($cur) + strlen($s) + 1 > $this->config['audio']['max_text_length']) {
                 $chunks[] = $cur;
                 $cur = $s;
             } else {
@@ -85,10 +83,10 @@ class AudioHandler {
 
     private function ensureSafeUrlLength(string $txt): string {
         $base = 'https://text.pollinations.ai/';
-        $params = '?model=openai-audio&voice=' . rawurlencode($this->config['audio']['voice'] ?? $this->voice);
+        $params = '?model=openai-audio&voice=' . rawurlencode($this->config['audio']['voice']);
         $urlLen = strlen($base) + strlen(rawurlencode($txt)) + strlen($params);
         if ($urlLen > 2000) {
-            return substr($txt, 0, $this->max_text_length - 3) . '...';
+            return substr($txt, 0, $this->config['audio']['max_text_length'] - 3) . '...';
         }
         return $txt;
     }
@@ -102,7 +100,7 @@ class AudioHandler {
             return false;
         }
 
-        $voice = $this->voice;
+        $voice = $this->config['audio']['voice'];
         $chunks = $this->splitTextIntoChunks($this->preprocessText($text));
         $ok = true;
 

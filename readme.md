@@ -356,6 +356,23 @@ Success or failure in these rolls determines the outcome of your actions and how
   - Adjust the `scale` parameter under the `image` key in `app/config.php` to change the resolution of the ASCII art.
   - You can also experiment with different character sets in `app/AsciiArtConverter.php`.
 
+- **Customizing Audio Settings**
+
+  You can configure the voice and maximum text length for audio generation by editing the `audio` section in `app/config.php`:
+
+  ```php
+  'audio' => [
+      'voice' => 'ash',            // Change to your preferred voice
+      'model' => 'openai-audio',   // Audio model used
+      'max_text_length' => 5120,   // Maximum characters per audio request
+  ],
+  ```
+
+  - **voice**: The default voice for text-to-speech (e.g., 'ash').
+  - **max_text_length**: The maximum number of characters per audio generation request. If your narration is longer, it will be split into chunks.
+
+  Any changes here will automatically be used by the game's audio system.
+
 ---
 
 ## License

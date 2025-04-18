@@ -14,7 +14,7 @@ return [
         'model' => 'gpt-4o-mini',
         'chat_url' => 'https://api.openai.com/v1/chat/completions',
         'max_tokens' => 1000,
-        'temperature' => 0.8,
+        'temperature' => 1.0,
         'max_image_description_length' => 64,
     ],
     
@@ -28,6 +28,7 @@ return [
     'audio' => [
         'voice' => 'ash',
         'model' => 'openai-audio',
+        'max_text_length' => 5120,
     ],
     
     'weights' => [
