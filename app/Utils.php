@@ -38,8 +38,8 @@ class Utils {
             $message = "Generating";
         }
 
-        // Start spinner as a background process
-        $cmd = "php " . escapeshellarg(__DIR__ . "/SpinnerProcess.php") . " " . escapeshellarg($message) . " > /dev/tty & echo $!";
+        // Start spinner as a background process with /dev/tty as STDIN and STDOUT
+        $cmd = "php " . escapeshellarg(__DIR__ . "/SpinnerProcess.php") . " " . escapeshellarg($message) . " < /dev/tty > /dev/tty 2>&1 & echo $!";
         $pid = (int) shell_exec($cmd);
         return $pid;
     }
@@ -51,4 +51,56 @@ class Utils {
             echo "\r" . str_repeat(" ", 50) . "\r";
         }
     }
-} 
+
+    /**
+     * Run a long operation with spinner and support for 'x' cancellation from the terminal.
+     * @param callable $operation function that does the work; should return true on success, false on error/cancel
+     * @param string $context 'audio' or 'image' (spinner message)
+     * @param string $cancelFlag path to a flag file to signal cancellation to the closure
+     * @return bool true if completed, false if cancelled
+     */
+    public static function runWithSpinnerAndCancellation(callable $operation, $context = null, $cancelFlag = null) {
+        $spinner_pid = self::showLoadingAnimation($context);
+        $sttySettings = shell_exec('stty -g');
+        shell_exec('stty -icanon -echo');
+        stream_set_blocking(STDIN, false);
+        $cancelled = false;
+        try {
+            $work_done = false;
+            $result = null;
+            while (!$work_done) {
+                // Check for 'x' keypress
+                $input = fread(STDIN, 1);
+                if ($input !== false && strtolower($input) === 'x') {
+                    posix_kill($spinner_pid, SIGTERM);
+                    echo "\nGeneration cancelled by user.\n";
+                    $cancelled = true;
+                    if ($cancelFlag) {
+                        // Create a flag file to signal cancellation to the closure
+                        file_put_contents($cancelFlag, '1');
+                    }
+                    break;
+                }
+                // Try to run a step of the operation if not yet started
+                if ($result === null) {
+                    $result = $operation();
+                    $work_done = true;
+                }
+                usleep(100000); // 100ms
+            }
+        } finally {
+            if (!empty($sttySettings)) {
+                shell_exec('stty ' . $sttySettings);
+            } else {
+                shell_exec('stty sane');
+            }
+            stream_set_blocking(STDIN, true);
+            self::stopLoadingAnimation($spinner_pid);
+            // Clean up cancel flag if it exists
+            if ($cancelFlag && file_exists($cancelFlag)) {
+                @unlink($cancelFlag);
+            }
+        }
+        return !$cancelled && $result !== false;
+    }
+}

@@ -115,47 +115,61 @@ class AudioHandler {
                     . rawurlencode($prompt)
                     . "?model=openai-audio&voice=" . rawurlencode($voice);
 
-            $loading_pid = Utils::showLoadingAnimation('audio');
-
-            $this->write_debug_log("Fetching chunk {$i}", [
-                'url'         => substr($url,0,200).'...',
-                'chunk_length'=> strlen($chunk)
-            ]);
-
-            // cURL GET
-            $ch = curl_init($url);
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_FOLLOWLOCATION => true,
-                CURLOPT_TIMEOUT        => 60,
-                CURLOPT_VERBOSE        => $this->debug
-            ]);
-            $data = curl_exec($ch);
-            $err  = curl_error($ch);
-            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-            Utils::stopLoadingAnimation($loading_pid);
-
-            if ($err || $code !== 200 || !$data) {
-                $this->write_debug_log("Failed chunk {$i}", [
-                    'http_code' => $code,
-                    'curl_err'  => $err,
-                    'data_len'  => strlen($data)
+            $cancelFlag = sys_get_temp_dir() . "/audio_cancel.flag";
+            $success = \App\Utils::runWithSpinnerAndCancellation(function() use ($url, $file, $i, &$ok, $chunk, $cancelFlag) {
+                // Remove any old cancel flag
+                if (file_exists($cancelFlag)) @unlink($cancelFlag);
+                $this->write_debug_log("Fetching chunk {$i}", [
+                    'url'         => substr($url,0,200).'...',
+                    'chunk_length'=> strlen($chunk)
                 ]);
+                // cURL GET
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_FOLLOWLOCATION => true,
+                    CURLOPT_TIMEOUT        => 60,
+                    CURLOPT_VERBOSE        => $this->debug,
+                    CURLOPT_NOPROGRESS     => false,
+                    CURLOPT_PROGRESSFUNCTION => function($download_size, $downloaded, $upload_size, $uploaded) use ($cancelFlag) {
+                        if (file_exists($cancelFlag)) {
+                            return 1; // abort transfer
+                        }
+                        return 0;
+                    }
+                ]);
+                $data = curl_exec($ch);
+                $err  = curl_error($ch);
+                $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                if (file_exists($cancelFlag)) @unlink($cancelFlag);
+
+                if ($err || $code !== 200 || !$data) {
+                    $this->write_debug_log("Failed chunk {$i}", [
+                        'http_code' => $code,
+                        'curl_err'  => $err,
+                        'data_len'  => strlen($data)
+                    ]);
+                    $ok = false;
+                    return false;
+                }
+
+                file_put_contents($file, $data);
+                $this->write_debug_log("Saved chunk {$i}", ['file'=>$file,'size'=>filesize($file)]);
+
+                if ($cmd = $this->getAudioPlayerCommand($file)) {
+                    shell_exec("$cmd 2>&1");
+                } else {
+                    $this->write_debug_log("No player for chunk {$i}");
+                    $ok = false;
+                }
+                return true;
+            }, 'audio', $cancelFlag);
+
+            if (!$success) {
                 $ok = false;
-                continue;
+                break;
             }
-
-            file_put_contents($file, $data);
-            $this->write_debug_log("Saved chunk {$i}", ['file'=>$file,'size'=>filesize($file)]);
-
-            if ($cmd = $this->getAudioPlayerCommand($file)) {
-                shell_exec("$cmd 2>&1");
-            } else {
-                $this->write_debug_log("No player for chunk {$i}");
-                $ok = false;
-            }
-
             // Optionally clean up:
             // @unlink($file);
         }

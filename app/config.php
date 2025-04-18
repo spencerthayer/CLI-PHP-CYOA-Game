@@ -22,7 +22,7 @@ return [
         'max_iterations' => 1280,
         'max_custom_action_length' => 512,
         'generate_image_toggle' => true,
-        'audio_toggle' => true,
+        'audio_toggle' => false,
     ],
     
     'audio' => [

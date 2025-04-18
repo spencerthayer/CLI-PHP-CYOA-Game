@@ -52,28 +52,28 @@ class ImageHandler {
         // Sanitize prompt: remove newlines before URL encoding
         $prompt = str_replace(["\n", "\r"], ' ', $prompt); // Replace newlines with spaces
         
-        $prompt_url = urlencode("8bit pixel art $prompt");
-        $url = "https://image.pollinations.ai/prompt/$prompt_url?nologo=true&width=360&height=160&seed=$timestamp&model=flux";
+        $prompt_url = urlencode("colorful pixel art: $prompt");
+        $url = "https://image.pollinations.ai/prompt/$prompt_url?negative_prompt=text&nologo=true&width=360&height=160&seed=$timestamp&model=turbo";
         write_debug_log("Requesting image from URL", ['url' => $url]);
         
         if ($this->debug) {
             echo "[DEBUG] Requesting image from URL: $url\n";
         }
         
-        $loading_pid = Utils::showLoadingAnimation('image');
+        $image_data = null;
+        $success = \App\Utils::runWithSpinnerAndCancellation(function() use ($url, &$image_data) {
+            // Set context options for timeout
+            $context = stream_context_create(['http' => ['timeout' => 15]]); // 15 second timeout
+            // Use error suppression and check the result with context
+            $image_data = @file_get_contents($url, false, $context);
+            return $image_data !== false;
+        }, 'image');
         
-        // Set context options for timeout
-        $context = stream_context_create(['http' => ['timeout' => 15]]); // 15 second timeout
-        
-        // Use error suppression and check the result with context
-        $image_data = @file_get_contents($url, false, $context);
-        Utils::stopLoadingAnimation($loading_pid);
-        
-        if ($image_data === false) {
+        if (!$success) {
             $error = error_get_last();
-            $error_message = $error['message'] ?? 'Unknown error';
+            $error_message = $error['message'] ?? 'Unknown error or cancelled';
             write_debug_log("Failed to fetch image", ['error' => $error_message]);
-            echo Utils::colorize("[yellow]Warning: Could not download image from Pollinations.ai ($error_message). Skipping image display.[/yellow]\n");
+            echo \App\Utils::colorize("[yellow]Warning: Could not download image from Pollinations.ai ($error_message). Skipping image display.[/yellow]\n");
             return null;
         }
         
@@ -96,25 +96,50 @@ class ImageHandler {
             write_debug_log("Successfully generated ASCII art");
             return $ascii_art;
         } else {
-            write_debug_log("Failed to generate ASCII art");
-            return null;
+            // fallback to title screen logic (unchanged)
+            $title_image_path = $this->config['paths']['images_dir'] . "/title_screen.jpg";
+            $title_url = "https://image.pollinations.ai/prompt/" . 
+                urlencode("8bit pixel art game title screen for \"The Dying Earth\", dark fantasy RPG game") . 
+                "?nologo=true&width=360&height=160&seed=$timestamp&model=flux";
+            write_debug_log("Requesting title screen image from URL", ['url' => $title_url]);
+            $context = stream_context_create(['http' => ['timeout' => 15]]);
+            $image_data = @file_get_contents($title_url, false, $context);
+            if ($image_data !== false) {
+                if (!@file_put_contents($title_image_path, $image_data)) {
+                    write_debug_log("Failed to save title screen image");
+                    echo \App\Utils::colorize("[yellow]Warning: Failed to save title screen image.[/yellow]\n");
+                    return null;
+                }
+            } else {
+                $error = error_get_last();
+                $error_message = $error['message'] ?? 'Network error or timeout';
+                write_debug_log("Failed to fetch title screen image", ['error' => $error_message]);
+                echo \App\Utils::colorize("[yellow]Warning: Could not download title screen image ($error_message).[/yellow]\n");
+                return null;
+            }
         }
+        if (file_exists($title_image_path)) {
+            return $this->generateAsciiArt($title_image_path);
+        }
+        return null;
     }
     
-    public function generate1Screen() {
+    public function generate1Screen($timestamp = null) {
         $title_image_path = $this->config['paths']['images_dir'] . '/static_title.png';
         
         // Generate title image if it doesn't exist
         if (!file_exists($title_image_path)) {
+            if ($timestamp === null) {
+                $timestamp = time();
+            }
             $title_url = "https://image.pollinations.ai/prompt/" . 
-                urlencode("8bit pixel art game title screen for \"The Dying Earth\", dark fantasy RPG game") . 
-                "?nologo=true&width=360&height=160&seed=123&model=flux";
+                urlencode("8bit pixel art game title screen for 'The Dying Earth', dark fantasy RPG game") . 
+                "?nologo=true&width=360&height=160&seed=$timestamp&model=flux";
             
-            write_debug_log("Requesting title screen image from URL", ['url' => $title_url]);
+            write_debug_log("Requesting title screen image from URL $title_url");
             
             // Set context options for timeout
             $context = stream_context_create(['http' => ['timeout' => 15]]); // 15 second timeout
-            
             // Use error suppression and check the result with context
             $image_data = @file_get_contents($title_url, false, $context);
             
