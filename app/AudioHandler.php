@@ -8,9 +8,9 @@ class AudioHandler {
     private $config;
     private $debug;
     private $tmp_dir;
-    private $max_text_length = 500; // URL‑safe chunk size
+    private $max_text_length = 5120;
 
-    public function __construct($config, $debug = false) {
+    public function __construct($conf1ig, $debug = false) {
         $this->config = $config;
         $this->debug  = $debug;
         $this->tmp_dir = $config['paths']['tmp_dir'] ?? './speech';

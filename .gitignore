@@ -34,7 +34,6 @@
 key.txt
 
 images/
-
-.DS_Store
-
+speech/
 tmp/
+.DS_Store
