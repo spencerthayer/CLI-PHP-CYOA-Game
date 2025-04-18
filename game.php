@@ -165,7 +165,7 @@ function validateApiCall($conversation, $user_input) {
         return false;
     }
 
-    if (in_array(strtolower($user_input), ['t', 'i', 'n', 'q', 's', 'a'])) {
+    if (in_array(strtolower($user_input), ['t', 'i', 'n', 'q', 's', 'a', 'c'])) {
         return false;
     }
 
@@ -340,6 +340,7 @@ while (true) {
                 break;
                 
             case 's':
+            case 'c':
                 displayCharacterSheet($gameState);
                 // Don't redisplay scene, just show menu again
                 continue 2;
