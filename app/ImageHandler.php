@@ -60,7 +60,7 @@ class ImageHandler {
             echo "[DEBUG] Requesting image from URL: $url\n";
         }
         
-        $loading_pid = Utils::showLoadingAnimation();
+        $loading_pid = Utils::showLoadingAnimation('image');
         
         // Set context options for timeout
         $context = stream_context_create(['http' => ['timeout' => 15]]); // 15 second timeout

@@ -96,6 +96,7 @@ class AudioHandler {
      * Main TTS via GET
      */
     public function speakNarrative(string $text): bool {
+        Utils::showLoadingAnimation('audio');
         if (!trim($text)) {
             $this->write_debug_log("Empty text, skipping");
             return false;

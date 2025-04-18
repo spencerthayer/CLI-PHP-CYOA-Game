@@ -26,19 +26,30 @@ class Utils {
         return wordwrap($text, $width, "\n", true);
     }
     
-    public static function showLoadingAnimation($message = "Generating image") {
+    public static function showLoadingAnimation($context = null, $customMessage = null) {
         $frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
         $frameCount = count($frames);
-        
+
+        // Determine the message based on context or use custom
+        if ($customMessage) {
+            $message = $customMessage;
+        } elseif ($context === 'audio') {
+            $message = "Generating audio";
+        } elseif ($context === 'image') {
+            $message = "Generating image";
+        } else {
+            $message = "Generating";
+        }
+
         echo "\n";
-        
+
         // Simple non-blocking animation
         for ($i = 0; $i < 10; $i++) {
             echo "\r" . $frames[$i % $frameCount] . " $message...";
             usleep(100000); // 100ms delay
             flush();
         }
-        
+
         return null;
     }
     
