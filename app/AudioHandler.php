@@ -96,7 +96,6 @@ class AudioHandler {
      * Main TTS via GET
      */
     public function speakNarrative(string $text): bool {
-        Utils::showLoadingAnimation('audio');
         if (!trim($text)) {
             $this->write_debug_log("Empty text, skipping");
             return false;
@@ -117,6 +116,8 @@ class AudioHandler {
                     . rawurlencode($prompt)
                     . "?model=openai-audio&voice=" . rawurlencode($voice);
 
+            $loading_pid = Utils::showLoadingAnimation('audio');
+
             $this->write_debug_log("Fetching chunk {$i}", [
                 'url'         => substr($url,0,200).'...',
                 'chunk_length'=> strlen($chunk)
@@ -134,6 +135,7 @@ class AudioHandler {
             $err  = curl_error($ch);
             $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
+            Utils::stopLoadingAnimation($loading_pid);
 
             if ($err || $code !== 200 || !$data) {
                 $this->write_debug_log("Failed chunk {$i}", [

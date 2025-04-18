@@ -27,9 +27,6 @@ class Utils {
     }
     
     public static function showLoadingAnimation($context = null, $customMessage = null) {
-        $frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-        $frameCount = count($frames);
-
         // Determine the message based on context or use custom
         if ($customMessage) {
             $message = $customMessage;
@@ -41,20 +38,16 @@ class Utils {
             $message = "Generating";
         }
 
-        echo "\n";
-
-        // Simple non-blocking animation
-        for ($i = 0; $i < 10; $i++) {
-            echo "\r" . $frames[$i % $frameCount] . " $message...";
-            usleep(100000); // 100ms delay
-            flush();
-        }
-
-        return null;
+        // Start spinner as a background process
+        $cmd = "php " . escapeshellarg(__DIR__ . "/SpinnerProcess.php") . " " . escapeshellarg($message) . " > /dev/tty & echo $!";
+        $pid = (int) shell_exec($cmd);
+        return $pid;
     }
     
     public static function stopLoadingAnimation($pid) {
         if ($pid) {
+            // Kill the spinner process
+            posix_kill($pid, SIGTERM);
             echo "\r" . str_repeat(" ", 50) . "\r";
         }
     }
