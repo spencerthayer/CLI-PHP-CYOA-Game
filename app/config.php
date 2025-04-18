@@ -13,14 +13,14 @@ return [
     'api' => [
         'model' => 'gpt-4o-mini',
         'chat_url' => 'https://api.openai.com/v1/chat/completions',
-        'max_tokens' => 1000,
+        'max_tokens' => 1280,
         'temperature' => 1.0,
         'max_image_description_length' => 64,
     ],
     
     'game' => [
-        'max_iterations' => 1000,
-        'max_custom_action_length' => 500,
+        'max_iterations' => 1280,
+        'max_custom_action_length' => 512,
         'generate_image_toggle' => true,
         'audio_toggle' => true,
     ],
@@ -28,7 +28,7 @@ return [
     'audio' => [
         'voice' => 'ash',
         'model' => 'openai-audio',
-        'max_text_length' => 5120,
+        'max_text_length' => 1280,
     ],
     
     'weights' => [
