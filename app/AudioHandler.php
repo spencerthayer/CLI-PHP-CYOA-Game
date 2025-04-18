@@ -9,6 +9,7 @@ class AudioHandler {
     private $debug;
     private $tmp_dir;
     private $max_text_length = 5120;
+    private $voice = 'ash';
 
     public function __construct($config, $debug = false) {
         $this->config = $config;
@@ -84,7 +85,7 @@ class AudioHandler {
 
     private function ensureSafeUrlLength(string $txt): string {
         $base = 'https://text.pollinations.ai/';
-        $params = '?model=openai-audio&voice=' . rawurlencode($this->config['audio']['voice'] ?? 'ash');
+        $params = '?model=openai-audio&voice=' . rawurlencode($this->config['audio']['voice'] ?? $this->voice);
         $urlLen = strlen($base) + strlen(rawurlencode($txt)) + strlen($params);
         if ($urlLen > 2000) {
             return substr($txt, 0, $this->max_text_length - 3) . '...';
@@ -101,7 +102,7 @@ class AudioHandler {
             return false;
         }
 
-        $voice = $this->config['audio']['voice'] ?? 'alloy';
+        $voice = $this->voice;
         $chunks = $this->splitTextIntoChunks($this->preprocessText($text));
         $ok = true;
 

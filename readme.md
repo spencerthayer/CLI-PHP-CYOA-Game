@@ -19,6 +19,34 @@ Welcome to **The Quest of the Forgotten Realm**, an interactive text-based adven
 
 ---
 
+## Animated Loading Spinner for Image and Audio Generation
+
+This project now features a concurrent animated loading spinner for both image and audio generation requests. The spinner provides immediate, responsive feedback to the user while waiting for API responses from Pollinations.ai.
+
+### How It Works
+- When generating images or audio, the spinner animation starts **immediately before** the API call and stops as soon as the response is received.
+- The spinner runs as a background process (`app/SpinnerProcess.php`), allowing it to animate independently of blocking operations.
+- The spinner message adapts to the context: "Generating image" or "Generating audio".
+
+### Relevant Files
+- `app/Utils.php` — Utility functions for starting/stopping the spinner with `showLoadingAnimation` and `stopLoadingAnimation`.
+- `app/SpinnerProcess.php` — The background process that displays the spinner.
+- `app/ImageHandler.php` & `app/AudioHandler.php` — Updated to start the spinner before and stop it after each API request.
+
+### Example Usage (Code Snippet)
+```php
+$loading_pid = Utils::showLoadingAnimation('image'); // or 'audio'
+// ... make API request ...
+Utils::stopLoadingAnimation($loading_pid);
+```
+
+### Why This Matters
+- **Improved UX:** Users see instant feedback when waiting for image or audio generation.
+- **Accurate Timing:** The spinner reflects the actual API wait time, not just a fixed delay.
+- **Non-blocking:** The game remains responsive while the spinner animates.
+
+---
+
 ## Prerequisites
 
 Before you begin, ensure you have met the following requirements:
