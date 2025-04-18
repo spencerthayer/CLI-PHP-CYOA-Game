@@ -52,7 +52,7 @@ class ImageHandler {
         // Sanitize prompt: remove newlines before URL encoding
         $prompt = str_replace(["\n", "\r"], ' ', $prompt); // Replace newlines with spaces
         
-        $prompt_url = urlencode("8bit ANSI video game $prompt");
+        $prompt_url = urlencode("8bit pixel art $prompt");
         $url = "https://image.pollinations.ai/prompt/$prompt_url?nologo=true&width=360&height=160&seed=$timestamp&model=flux";
         write_debug_log("Requesting image from URL", ['url' => $url]);
         
@@ -107,7 +107,7 @@ class ImageHandler {
         // Generate title image if it doesn't exist
         if (!file_exists($title_image_path)) {
             $title_url = "https://image.pollinations.ai/prompt/" . 
-                urlencode("8bit pixel art game title screen for The Dying Earth, dark fantasy RPG game") . 
+                urlencode("8bit pixel art game title screen for \"The Dying Earth\", dark fantasy RPG game") . 
                 "?nologo=true&width=360&height=160&seed=123&model=flux";
             
             write_debug_log("Requesting title screen image from URL", ['url' => $title_url]);
