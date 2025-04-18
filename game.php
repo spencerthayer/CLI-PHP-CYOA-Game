@@ -114,6 +114,12 @@ write_debug_log("ImageHandler initialized");
 $audioHandler = new AudioHandler($config, $debug);
 write_debug_log("AudioHandler initialized");
 
+// Test audio generation (DEBUG ONLY)
+if ($debug) {
+    write_debug_log("Testing audio generation API");
+    $audioHandler->testAudioGeneration();
+}
+
 $apiHandler = new ApiHandler($config, get_api_key($config['paths']['api_key_file']), $gameState, $debug);
 write_debug_log("ApiHandler initialized with CharacterStats integration");
 
@@ -140,7 +146,7 @@ if (in_array('--new', $argv)) {
     }
     
     // Display title screen
-    $title_art = $imageHandler->generateTitleScreen();
+    $title_art = $imageHandler->generate1Screen();
     if ($title_art) {
         echo "\n" . $title_art . "\n\n";
     }
@@ -279,7 +285,7 @@ while (true) {
                     echo "Starting a new game...\n";
                     
                     // Generate and display the title screen
-                    $title_screen = $imageHandler->generateTitleScreen();
+                    $title_screen = $imageHandler->generate1Screen();
                     if ($title_screen) {
                         echo $title_screen . "\n";
                     }
@@ -600,20 +606,29 @@ function displayScene($scene_data, $generate_image_toggle = true, $imageHandler 
         }
     }
     
-    // Display narrative text
-    $narrative = Utils::wrapText($scene_data->narrative);
-    echo "\n" . Utils::colorize($narrative) . "\n\n";
+    // --- Corrected Narrative Handling ---
+    
+    // 1. Get the raw narrative
+    $raw_narrative = $scene_data->narrative ?? '';
 
-    // Then speak narrative (if enabled)
-    if ($generate_audio_toggle && $audioHandler && isset($scene_data->narrative)) {
+    // 2. Prepare text for display: Colorize first, then wrap.
+    $colorized_narrative = Utils::colorize($raw_narrative); // Apply [color] tags -> ANSI codes
+    $display_narrative = Utils::wrapText($colorized_narrative); // Wrap text with ANSI codes
+    echo "\n" . $display_narrative . "\n\n";
+
+    // 3. Prepare text for audio: Strip [color] tags from raw text.
+    if ($generate_audio_toggle && $audioHandler && !empty(trim($raw_narrative))) {
+        // Strip [color] tags (using regex to match tags like [red], [/bold], etc.)
+        $text_for_audio = preg_replace('/\[\/?\w+\]/', '', $raw_narrative);
+        
         global $debug;
         if ($debug) {
-            write_debug_log("Attempting to speak narrative");
+            write_debug_log("Attempting to speak narrative", ['text' => $text_for_audio]);
         }
-        // Strip ANSI codes before sending to audio, just like wrapText does for display
-        $text_for_audio = preg_replace('/\\x1b\\[[0-9;]*m/', '', $scene_data->narrative);
         $audioHandler->speakNarrative($text_for_audio);
     }
+
+    // --- End Corrected Narrative Handling ---
 
     // Display options
     echo Utils::colorize("\n[bold]Choose your next action:[/bold]\n");

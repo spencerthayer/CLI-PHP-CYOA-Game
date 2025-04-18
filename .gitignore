@@ -36,3 +36,5 @@ key.txt
 images/
 
 .DS_Store
+
+tmp/

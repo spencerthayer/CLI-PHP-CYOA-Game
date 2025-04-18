@@ -7,7 +7,7 @@ return [
         'user_prefs_file' => __DIR__ . '/../.data/.user_prefs',
         'debug_log_file' => __DIR__ . '/../.data/.debug_log',
         'images_dir' => __DIR__ . '/../images',
-        'tmp_dir' => __DIR__ . '/../tmp',
+        'tmp_dir' => __DIR__ . '/../speech',
     ],
     
     'api' => [

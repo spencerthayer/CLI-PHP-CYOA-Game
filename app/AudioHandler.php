@@ -8,69 +8,164 @@ class AudioHandler {
     private $config;
     private $debug;
     private $tmp_dir;
+    private $max_text_length = 500; // URL‑safe chunk size
 
     public function __construct($config, $debug = false) {
         $this->config = $config;
-        $this->debug = $debug;
-        $this->tmp_dir = $config['paths']['tmp_dir'] ?? './tmp';
+        $this->debug  = $debug;
+        $this->tmp_dir = $config['paths']['tmp_dir'] ?? './speech';
 
-        // Ensure tmp directory exists
         if (!is_dir($this->tmp_dir)) {
             if (!mkdir($this->tmp_dir, 0755, true)) {
-                throw new \Exception("Failed to create temporary directory: {$this->tmp_dir}");
+                throw new \Exception("Failed to create speech directory: {$this->tmp_dir}");
             }
         }
+
+        $abs = realpath($this->tmp_dir);
+        $this->write_debug_log("Speech dir: {$abs}", [
+            'writable' => is_writable($this->tmp_dir) ? 'yes' : 'no',
+            'readable' => is_readable($this->tmp_dir) ? 'yes' : 'no'
+        ]);
     }
 
-    private function write_debug_log($message, $context = null) {
+    private function write_debug_log($msg, $ctx = null) {
         if (!$this->debug) return;
-        write_debug_log('[AudioHandler] ' . $message, $context);
+        write_debug_log('[AudioHandler] '.$msg, $ctx);
+    }
+
+    private function preprocessText(string $txt): string {
+        $txt = preg_replace('/\033\[[0-9;]*m/', '', $txt);
+        $txt = preg_replace('/\[\/?\w+\]/', '', $txt);
+        $txt = preg_replace('/\s+/', ' ', $txt);
+        $txt = preg_replace('/([.!?])(\w)/', '$1 $2', $txt);
+        $txt = preg_replace('/[\x00-\x1F\x7F]/', '', $txt);
+        return trim($txt);
+    }
+
+    private function getAudioPlayerCommand(string $file): ?string {
+        $os = PHP_OS; $f = escapeshellarg($file);
+        if (stripos($os,'DAR')===0) {
+            foreach (['afplay','mpg123','mpg321','mplayer'] as $p) {
+                if (shell_exec("which $p 2>/dev/null")) {
+                    return "$p $f";
+                }
+            }
+            return "/usr/bin/afplay $f";
+        }
+        if (stripos($os,'WIN')===0) {
+            return "powershell -c (New-Object Media.SoundPlayer $f).PlaySync()";
+        }
+        foreach (['mpg123','mpg321','mplayer','aplay','ffplay'] as $p) {
+            if ($path = trim(shell_exec("which $p 2>/dev/null"))) {
+                return "$path $f";
+            }
+        }
+        return null;
+    }
+
+    private function splitTextIntoChunks(string $txt): array {
+        if (strlen($txt) <= $this->max_text_length) {
+            return [$txt];
+        }
+        $chunks = [];
+        $sentences = preg_split('/(?<=[.!?])\s+/', $txt, -1, PREG_SPLIT_NO_EMPTY);
+        $cur = '';
+        foreach ($sentences as $s) {
+            if (strlen($cur) + strlen($s) + 1 > $this->max_text_length) {
+                $chunks[] = $cur;
+                $cur = $s;
+            } else {
+                $cur .= ($cur? ' ' : '') . $s;
+            }
+        }
+        if ($cur) $chunks[] = $cur;
+        return $chunks;
+    }
+
+    private function ensureSafeUrlLength(string $txt): string {
+        $base = 'https://text.pollinations.ai/';
+        $params = '?model=openai-audio&voice=' . rawurlencode($this->config['audio']['voice'] ?? 'alloy');
+        $urlLen = strlen($base) + strlen(rawurlencode($txt)) + strlen($params);
+        if ($urlLen > 2000) {
+            return substr($txt, 0, $this->max_text_length - 3) . '...';
+        }
+        return $txt;
     }
 
     /**
-     * Generates speech from text using Pollinations.AI and plays it.
-     *
-     * @param string $text The text to speak.
-     * @return bool True on success, false on failure.
+     * Main TTS via GET
      */
     public function speakNarrative(string $text): bool {
-        if (empty(trim($text))) {
-            $this->write_debug_log("Skipping empty text for speech.");
+        if (!trim($text)) {
+            $this->write_debug_log("Empty text, skipping");
             return false;
         }
 
-        $voice = $this->config['audio']['voice'] ?? 'alloy'; // Default voice
-        $model = $this->config['audio']['model'] ?? 'openai-audio';
-        $apiUrl = 'https://text.pollinations.ai/';
-        $audio_file = $this->tmp_dir . '/speech.mp3';
+        $voice = $this->config['audio']['voice'] ?? 'alloy';
+        $chunks = $this->splitTextIntoChunks($this->preprocessText($text));
+        $ok = true;
 
-        $encoded_text = rawurlencode($text);
-        $url = "{$apiUrl}{$encoded_text}?model={$model}&voice={$voice}";
+        foreach ($chunks as $i => $chunk) {
+            $chunk = $this->ensureSafeUrlLength($chunk);
+            $ts    = time();
+            $file  = "{$this->tmp_dir}/speech_{$ts}_{$i}.mp3";
 
-        // Use curl to download the audio file
-        $curl_cmd = sprintf('curl -s -L -o %s "%s"', escapeshellarg($audio_file), $url);
-        $this->write_debug_log("Executing curl command", ['command' => $curl_cmd]);
-        shell_exec($curl_cmd . ' 2>&1'); // Redirect stderr to stdout to potentially capture errors
+            // wrap in Say: "…"
+            $prompt = 'Say: "' . $chunk . '"';
+            $url    = "https://text.pollinations.ai/"
+                    . rawurlencode($prompt)
+                    . "?model=openai-audio&voice=" . rawurlencode($voice);
 
-        // Check if the file was created and is not empty
-        if (!file_exists($audio_file) || filesize($audio_file) === 0) {
-            $this->write_debug_log("Failed to download audio file or file is empty.", ['url' => $url, 'file' => $audio_file]);
-            @unlink($audio_file); // Attempt to clean up empty file
-            return false;
+            $this->write_debug_log("Fetching chunk {$i}", [
+                'url'         => substr($url,0,200).'...',
+                'chunk_length'=> strlen($chunk)
+            ]);
+
+            // cURL GET
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_TIMEOUT        => 60,
+                CURLOPT_VERBOSE        => $this->debug
+            ]);
+            $data = curl_exec($ch);
+            $err  = curl_error($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($err || $code !== 200 || !$data) {
+                $this->write_debug_log("Failed chunk {$i}", [
+                    'http_code' => $code,
+                    'curl_err'  => $err,
+                    'data_len'  => strlen($data)
+                ]);
+                $ok = false;
+                continue;
+            }
+
+            file_put_contents($file, $data);
+            $this->write_debug_log("Saved chunk {$i}", ['file'=>$file,'size'=>filesize($file)]);
+
+            if ($cmd = $this->getAudioPlayerCommand($file)) {
+                shell_exec("$cmd 2>&1");
+            } else {
+                $this->write_debug_log("No player for chunk {$i}");
+                $ok = false;
+            }
+
+            // Optionally clean up:
+            // @unlink($file);
         }
-        $this->write_debug_log("Audio file downloaded successfully.", ['file' => $audio_file, 'size' => filesize($audio_file)]);
 
-        // Use afplay (macOS specific) to play the audio file
-        // TODO: Make the player configurable or add checks for different OS
-        $play_cmd = sprintf('afplay %s', escapeshellarg($audio_file));
-        $this->write_debug_log("Executing play command", ['command' => $play_cmd]);
-        shell_exec($play_cmd . ' 2>&1');
+        return $ok;
+    }
 
-        // Clean up the audio file
-        $rm_cmd = sprintf('rm %s', escapeshellarg($audio_file));
-        $this->write_debug_log("Executing cleanup command", ['command' => $rm_cmd]);
-        shell_exec($rm_cmd);
-
-        return true;
+    /**
+     * Quick test of GET-based TTS
+     */
+    public function testAudioGeneration(): void {
+        $this->write_debug_log("Testing TTS GET endpoint");
+        $this->speakNarrative("This is a quick test of Pollinations.AI text to speech.");
     }
 } 
