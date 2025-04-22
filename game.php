@@ -274,7 +274,11 @@ while (true) {
                     if ($msg_timestamp > $last_processed_timestamp) {
                         if ($debug) write_debug_log("New message to display: timestamp=$msg_timestamp, last_processed=$last_processed_timestamp");
                         $scene_data = $new_scene_data;
+                        
+                        // CRITICAL: Set the timestamp for proper image loading
                         $scene_data->timestamp = $msg_timestamp;
+                        if ($debug) write_debug_log("Setting scene timestamp to message timestamp: " . $msg_timestamp);
+                        
                         displayScene($scene_data, $generate_image_toggle, $imageHandler, $generate_audio_toggle, $audioHandler);
                         $last_processed_timestamp = $msg_timestamp;
                     }
@@ -627,27 +631,22 @@ function displayScene($scene_data, $generate_image_toggle = true, $imageHandler 
     if ($debug) write_debug_log("Displaying narrative: " . substr($scene_data->narrative, 0, 50) . "...");
     // Display image first (if enabled)
     if ($generate_image_toggle && $imageHandler) {
-        // Try to display existing image first
-        $ascii_art = null;
         $timestamp = $scene_data->timestamp ?? time();
         
-        if ($debug) write_debug_log("Checking for image with timestamp: " . $timestamp);
+        if ($debug) write_debug_log("Using timestamp for image: " . $timestamp);
         
-        // First check if image exists
+        // Always try to use displayExistingImage first - only fall back to generate if needed
+        $ascii_art = null;
         if ($imageHandler->imageExistsForTimestamp($timestamp)) {
             if ($debug) write_debug_log("Found existing image for timestamp: " . $timestamp);
             $ascii_art = $imageHandler->displayExistingImage($timestamp);
-            if ($ascii_art) {
-                echo "\n" . $ascii_art . "\n\n";
-            }
-        }
-        // If no existing image and we have a prompt, generate a new one
-        else if (isset($scene_data->image->prompt)) {
-            if ($debug) write_debug_log("Generating new image for timestamp: " . $timestamp);
+        } else if (isset($scene_data->image->prompt)) {
+            if ($debug) write_debug_log("No existing image found, generating new one with timestamp: " . $timestamp);
             $ascii_art = $imageHandler->generateImage($scene_data->image->prompt, $timestamp);
-            if ($ascii_art) {
-                echo "\n" . $ascii_art . "\n\n";
-            }
+        }
+        
+        if ($ascii_art) {
+            echo "\n" . $ascii_art . "\n\n";
         }
     }
     

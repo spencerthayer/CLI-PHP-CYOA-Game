@@ -98,6 +98,15 @@ class ImageHandler {
     }
     
     public function generateImage($prompt, $timestamp) {
+        // FIRST check if an image with this timestamp already exists
+        if ($this->imageExistsForTimestamp($timestamp)) {
+            if ($this->debug) {
+                echo "[DEBUG] Image already exists for timestamp $timestamp. Using existing image instead of generating new one.\n";
+            }
+            write_debug_log("Using existing image instead of generating new one", ['timestamp' => $timestamp]);
+            return $this->displayExistingImage($timestamp);
+        }
+    
         write_debug_log("Generating new image", ['prompt' => $prompt, 'timestamp' => $timestamp]);
         
         if (!is_string($prompt)) {
