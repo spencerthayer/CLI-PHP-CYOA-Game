@@ -94,7 +94,7 @@ class ImageHandler {
      * @return string
      */
     private function getTitlePrompt(): string {
-        return "8bit pixel art game title screen for \"The Dying Earth\", dark fantasy RPG game";
+        return "Grimdark 8bit pixel art game title screen for \"The Dying Earth\", dark fantasy RPG game";
     }
     
     public function generateImage($prompt, $timestamp) {
@@ -135,7 +135,7 @@ class ImageHandler {
             return null;
         }
         
-        $final_prompt = "8bit pixel art $prompt";
+        $final_prompt = "Grimdark 8bit pixel art $prompt";
         $url = $this->buildPollinationsUrl($final_prompt, $timestamp);
         $image_path = $this->config['paths']['images_dir'] . "/temp_image_$timestamp.jpg";
         
