@@ -129,6 +129,8 @@ $generate_audio_toggle = $config['game']['audio_toggle'] ?? true;
 $should_make_api_call = false;
 $last_user_input = '';
 $scene_data = null;
+$scene_already_displayed = false;
+$current_scene_timestamp = 0;  // Track the currently displayed scene timestamp
 
 // Check for new game flag
 if (in_array('--new', $argv)) {
@@ -158,6 +160,7 @@ if (in_array('--new', $argv)) {
     $gameState->addMessage('user', 'start game');
     $should_make_api_call = true;
     $last_user_input = 'start game';
+    $scene_data = null; // Reset scene data for new game
 }
 
 // Function to validate API call
@@ -196,6 +199,10 @@ function validateApiCall($conversation, $user_input) {
 
 // Get initial conversation state
 $conversation = $gameState->getConversation();
+if ($debug) write_debug_log("Loaded conversation count: " . count($conversation));
+if (!empty($conversation)) {
+    if ($debug) write_debug_log("First conversation item: " . json_encode(array_slice($conversation, 0, 1)));
+}
 
 // If no conversation exists or --new flag was used, start a new game
 if (empty($conversation) || in_array('--new', $argv)) {
@@ -206,6 +213,10 @@ if (empty($conversation) || in_array('--new', $argv)) {
     }
     $should_make_api_call = true;
     $last_user_input = 'start game';
+    $scene_data = null; // Reset scene data for new game
+} else {
+    // Skip initial scene loading - we'll handle it in the main loop
+    $should_make_api_call = false;
 }
 
 // Make initial API call if needed
@@ -233,21 +244,44 @@ if ($should_make_api_call) {
         throw new \Exception("No valid response from API");
     }
     $should_make_api_call = false;
-} else {
-    // Get the last scene if it exists
-    $lastMessage = end($conversation);
-    if (isset($lastMessage['function_call']) && isset($lastMessage['function_call']->arguments)) {
-        $scene_data = json_decode($lastMessage['function_call']->arguments);
-    }
 }
 
 // Main game loop
 while (true) {
     try {
-        // Display the current scene and menu
-        if ($scene_data) {
-            displayScene($scene_data, $generate_image_toggle, $imageHandler, $generate_audio_toggle, $audioHandler);
+        $conversation = $gameState->getConversation();
+        $lastMsg = end($conversation);
+        
+        // Only process a scene once per game loop iteration
+        static $last_processed_timestamp = 0;
+        
+        // Extract scene data from the last message if needed
+        if (isset($lastMsg['function_call'])) {
+            $args = null;
+            if (is_object($lastMsg['function_call']) && isset($lastMsg['function_call']->arguments)) {
+                $args = $lastMsg['function_call']->arguments;
+            } elseif (is_array($lastMsg['function_call']) && isset($lastMsg['function_call']['arguments'])) {
+                $args = $lastMsg['function_call']['arguments'];
+            }
+            
+            if ($args) {
+                $new_scene_data = json_decode($args);
+                if ($new_scene_data && isset($new_scene_data->narrative)) {
+                    // Use timestamp from message or scene data
+                    $msg_timestamp = $lastMsg['timestamp'] ?? 0;
+                    
+                    // Only process scenes we haven't displayed yet
+                    if ($msg_timestamp > $last_processed_timestamp) {
+                        if ($debug) write_debug_log("New message to display: timestamp=$msg_timestamp, last_processed=$last_processed_timestamp");
+                        $scene_data = $new_scene_data;
+                        $scene_data->timestamp = $msg_timestamp;
+                        displayScene($scene_data, $generate_image_toggle, $imageHandler, $generate_audio_toggle, $audioHandler);
+                        $last_processed_timestamp = $msg_timestamp;
+                    }
+                }
+            }
         }
+        
         displayGameMenu($generate_image_toggle, $generate_audio_toggle);
         
         // Get user input using readline
@@ -293,7 +327,7 @@ while (true) {
                     
                     $imageHandler->clearImages();
                     $audioHandler->clearAudioFiles();
-                    $gameState = new GameState($config, $debug);
+                    $gameState = new GameState($config);
                     $gameState->addMessage('system', $config['system_prompt']);
                     $gameState->addMessage('user', 'start game');
                     $should_make_api_call = true;
@@ -584,25 +618,32 @@ function displayCharacterSheet($gameState) {
 
 // Function to display scene
 function displayScene($scene_data, $generate_image_toggle = true, $imageHandler = null, $generate_audio_toggle = true, $audioHandler = null) {
+    global $debug;  // Declare global $debug to fix undefined variable error
+    if ($debug) write_debug_log("DisplayScene called with scene_data options: " . json_encode($scene_data->options ?? 'No options'));
     if (!isset($scene_data->narrative)) {
+        if ($debug) write_debug_log("Error: No narrative in scene_data");
         return;
     }
-
+    if ($debug) write_debug_log("Displaying narrative: " . substr($scene_data->narrative, 0, 50) . "...");
     // Display image first (if enabled)
     if ($generate_image_toggle && $imageHandler) {
         // Try to display existing image first
         $ascii_art = null;
+        $timestamp = $scene_data->timestamp ?? time();
         
-        if (isset($scene_data->timestamp)) {
-            $ascii_art = $imageHandler->displayExistingImage($scene_data->timestamp);
+        if ($debug) write_debug_log("Checking for image with timestamp: " . $timestamp);
+        
+        // First check if image exists
+        if ($imageHandler->imageExistsForTimestamp($timestamp)) {
+            if ($debug) write_debug_log("Found existing image for timestamp: " . $timestamp);
+            $ascii_art = $imageHandler->displayExistingImage($timestamp);
             if ($ascii_art) {
                 echo "\n" . $ascii_art . "\n\n";
             }
         }
-        
-        // If no existing image, generate a new one
-        if (!$ascii_art && isset($scene_data->image->prompt)) {
-            $timestamp = $scene_data->timestamp ?? time();
+        // If no existing image and we have a prompt, generate a new one
+        else if (isset($scene_data->image->prompt)) {
+            if ($debug) write_debug_log("Generating new image for timestamp: " . $timestamp);
             $ascii_art = $imageHandler->generateImage($scene_data->image->prompt, $timestamp);
             if ($ascii_art) {
                 echo "\n" . $ascii_art . "\n\n";

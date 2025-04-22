@@ -33,6 +33,9 @@ class GameState {
             $history_content = file_get_contents($this->config['paths']['game_history_file']);
             if ($history_content !== false) {
                 $data = json_decode($history_content, true) ?: [];
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    write_debug_log("JSON decode error in loadState: " . json_last_error_msg());
+                }
                 $this->conversation = $data['conversation'] ?? [];
                 $this->conversation_history = $data['conversation_history'] ?? [];
                 $this->mechanics_history = $data['mechanics_history'] ?? [];
@@ -76,31 +79,32 @@ class GameState {
         $data_dir = dirname($save_file_path);
         if (!is_dir($data_dir)) {
             mkdir($data_dir, 0755, true);
+            if ($this->debug) write_debug_log("Created directory for save file: " . $data_dir);
         }
         
-        // Save with pretty printing for better readability
-        file_put_contents(
-            $this->config['paths']['game_history_file'], 
-            json_encode($state, JSON_PRETTY_PRINT), 
-            LOCK_EX
-        );
+        if (file_put_contents($save_file_path, json_encode($state, JSON_PRETTY_PRINT), LOCK_EX) !== false) {
+            if ($this->debug) write_debug_log("Game state saved successfully to " . $save_file_path);
+        } else {
+            if ($this->debug) write_debug_log("Failed to save game state to " . $save_file_path . ": Check permissions or disk space");
+        }
         
-        // After saving, update the conversation with the latest stats
         $this->updateConversationWithStats();
     }
     
     private function updateConversationWithStats() {
-        // Find the last assistant message with a function call
+        if ($this->debug) write_debug_log("Updating conversation with stats");
         for ($i = count($this->conversation) - 1; $i >= 0; $i--) {
             $message = $this->conversation[$i];
             if (isset($message['role']) && $message['role'] === 'assistant' && isset($message['function_call'])) {
                 if (isset($message['function_call']['name']) && $message['function_call']['name'] === 'GameResponse') {
-                    // Update the character_stats in the message
+                    if ($this->debug) write_debug_log("Found GameResponse in conversation");
                     $this->conversation[$i]['character_stats'] = $this->character_stats->getStats();
+                    if ($this->debug) write_debug_log("Updated stats in message");
                     break;
                 }
             }
         }
+        if ($this->debug) write_debug_log("Conversation update completed");
     }
     
     public function getConversation() {

@@ -137,7 +137,7 @@ class ImageHandler {
         
         $final_prompt = "Grimdark 8bit pixel art $prompt";
         $url = $this->buildPollinationsUrl($final_prompt, $timestamp);
-        $image_path = $this->config['paths']['images_dir'] . "/temp_image_$timestamp.jpg";
+        $image_path = $this->getImagePathForTimestamp($timestamp);
         
         if (!$this->fetchAndSaveImage($url, $image_path, 'image')) {
             return null;
@@ -210,7 +210,7 @@ class ImageHandler {
             echo "[DEBUG] Checking for existing image with timestamp: $timestamp\n";
         }
         
-        $image_path = $this->config['paths']['images_dir'] . "/temp_image_$timestamp.jpg";
+        $image_path = $this->getImagePathForTimestamp($timestamp);
         write_debug_log("Looking for image", ['path' => $image_path]);
         
         if ($this->debug) {
@@ -242,6 +242,27 @@ class ImageHandler {
             }
         }
         return null;
+    }
+    
+    /**
+     * Get the expected image path for a given timestamp
+     *
+     * @param int $timestamp Timestamp used for the image
+     * @return string Path to where the image should be stored
+     */
+    public function getImagePathForTimestamp($timestamp) {
+        return $this->config['paths']['images_dir'] . "/temp_image_$timestamp.jpg";
+    }
+    
+    /**
+     * Checks if an image exists for the given timestamp
+     *
+     * @param int $timestamp Timestamp used for the image
+     * @return bool True if image exists, false otherwise
+     */
+    public function imageExistsForTimestamp($timestamp) {
+        $image_path = $this->getImagePathForTimestamp($timestamp);
+        return file_exists($image_path);
     }
     
     public function clearImages() {
