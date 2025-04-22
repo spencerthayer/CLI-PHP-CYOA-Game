@@ -89,9 +89,9 @@ class CharacterSelector {
 
         // Get appropriate character set
         $chars = match($selected_set) {
-            'block' => $this->blockchars,
-            'progressive' => $this->progressivechars,
-            'alpha' => $this->alphachars,
+            'block' => $this->shadechars,
+            'progressive' => $this->shadechars,
+            'alpha' => $this->shadechars,
             'braille' => $this->braillechars,
             default => $this->shadechars
         };
