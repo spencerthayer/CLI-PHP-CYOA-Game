@@ -161,7 +161,7 @@ class ImageHandler {
                 $timestamp = time();
             }
             
-            $title_prompt = "8bit pixel art game title screen for 'The Dying Earth', dark fantasy RPG game";
+            $title_prompt = "8bit pixel art game title screen for \"The Dying Earth\", dark fantasy RPG game";
             $title_url = $this->buildPollinationsUrl($title_prompt, $timestamp);
             
             if (!$this->fetchAndSaveImage($title_url, $title_image_path, 'title')) {
