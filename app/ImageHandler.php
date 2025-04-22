@@ -88,6 +88,15 @@ class ImageHandler {
         return true;
     }
     
+    /**
+     * Returns the title screen generation prompt.
+     *
+     * @return string
+     */
+    private function getTitlePrompt(): string {
+        return "8bit pixel art game title screen for \"The Dying Earth\", dark fantasy RPG game";
+    }
+    
     public function generateImage($prompt, $timestamp) {
         write_debug_log("Generating new image", ['prompt' => $prompt, 'timestamp' => $timestamp]);
         
@@ -126,7 +135,7 @@ class ImageHandler {
             return null;
         }
         
-        $final_prompt = "colorful pixel art $prompt";
+        $final_prompt = "8bit pixel art $prompt";
         $url = $this->buildPollinationsUrl($final_prompt, $timestamp);
         $image_path = $this->config['paths']['images_dir'] . "/temp_image_$timestamp.jpg";
         
@@ -141,7 +150,7 @@ class ImageHandler {
         } else {
             // fallback to title screen logic
             $title_image_path = $this->config['paths']['images_dir'] . "/title_screen.jpg";
-            $title_prompt = "8bit pixel art game title screen for \"The Dying Earth\", dark fantasy RPG game";
+            $title_prompt = $this->getTitlePrompt();
             $title_url = $this->buildPollinationsUrl($title_prompt, $timestamp);
             
             if ($this->fetchAndSaveImage($title_url, $title_image_path, 'title')) {
@@ -161,7 +170,7 @@ class ImageHandler {
                 $timestamp = time();
             }
             
-            $title_prompt = "8bit pixel art game title screen for \"The Dying Earth\", dark fantasy RPG game";
+            $title_prompt = $this->getTitlePrompt();
             $title_url = $this->buildPollinationsUrl($title_prompt, $timestamp);
             
             if (!$this->fetchAndSaveImage($title_url, $title_image_path, 'title')) {
