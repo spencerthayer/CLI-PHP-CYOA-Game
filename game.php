@@ -659,7 +659,9 @@ function displayScene($scene_data, $generate_image_toggle = true, $imageHandler 
     //    a. First strip any existing unwanted line breaks
     //    b. Apply color codes
     //    c. Apply proper paragraph wrapping
-    //    d. Add padding only to the narrative text
+    //    d. Add padding to the narrative text
+    //    e. Add decorative flourishes
+    //    f. Center the entire block in the terminal
     
     // Start with a clean narrative without unwanted line breaks
     $clean_narrative = preg_replace('/\r\n|\r/', "\n", $raw_narrative);
@@ -670,10 +672,17 @@ function displayScene($scene_data, $generate_image_toggle = true, $imageHandler 
     // Apply proper paragraph wrapping (this preserves paragraphs and removes bad line breaks)
     $wrapped_narrative = Utils::wrapText($colorized_narrative, 120);
     
-    // Finally add padding to give it a book-like feel
-    $display_narrative = Utils::addTextPadding($wrapped_narrative, 6, 6);
+    // Add padding to the text for a book-like feel (reduced padding since we're adding borders)
+    $padded_narrative = Utils::addTextPadding($wrapped_narrative, 3, 3);
     
-    // Display the formatted narrative
+    // Add decorative flourishes around the text (can be 'simple', 'double', or 'fancy')
+    $flourish_style = 'fancy'; // Choose the style you prefer
+    $decorated_narrative = Utils::addTextFlourishes($padded_narrative, $flourish_style);
+    
+    // Center the entire text block in the terminal
+    $display_narrative = Utils::centerTextBlock($decorated_narrative);
+    
+    // Display the formatted narrative with a bit of vertical spacing
     echo "\n" . $display_narrative . "\n\n";
 
     // 3. Prepare text for audio: Strip [color] tags from raw text.

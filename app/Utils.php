@@ -152,4 +152,116 @@ class Utils {
         }
         return !$cancelled && $result !== false;
     }
+
+    /**
+     * Get the current terminal width
+     * @return int Width of the terminal
+     */
+    public static function getTerminalWidth() {
+        // Try to detect terminal width using stty
+        $width = 80; // Default fallback width
+        
+        if (PHP_OS_FAMILY !== 'Windows') {
+            $output = [];
+            $return_var = 0;
+            exec('stty size 2>/dev/null', $output, $return_var);
+            
+            if ($return_var === 0 && !empty($output[0])) {
+                $parts = explode(' ', trim($output[0]));
+                if (count($parts) >= 2 && is_numeric($parts[1])) {
+                    $width = (int)$parts[1];
+                }
+            }
+        }
+        
+        return $width;
+    }
+
+    /**
+     * Center a block of text in the terminal
+     * @param string $text Text block to center
+     * @return string Centered text block
+     */
+    public static function centerTextBlock($text) {
+        $terminalWidth = self::getTerminalWidth();
+        $lines = explode("\n", $text);
+        $result = [];
+        
+        foreach ($lines as $line) {
+            // Skip ANSI color codes when calculating visible length
+            $visibleLine = preg_replace('/\033\[[0-9;]*m/', '', $line);
+            $lineLength = mb_strlen($visibleLine);
+            
+            if ($lineLength < $terminalWidth) {
+                $paddingTotal = $terminalWidth - $lineLength;
+                $leftPadding = intval($paddingTotal / 2);
+                $result[] = str_repeat(' ', $leftPadding) . $line;
+            } else {
+                $result[] = $line;
+            }
+        }
+        
+        return implode("\n", $result);
+    }
+
+    /**
+     * Add decorative flourishes around a text block
+     * @param string $text Text to decorate
+     * @param string $style Style of decoration ('simple', 'double', 'fancy')
+     * @return string Decorated text
+     */
+    public static function addTextFlourishes($text, $style = 'simple') {
+        $lines = explode("\n", $text);
+        $maxLength = 0;
+        
+        // Find the maximum visible line length
+        foreach ($lines as $line) {
+            $visibleLine = preg_replace('/\033\[[0-9;]*m/', '', $line);
+            $maxLength = max($maxLength, mb_strlen($visibleLine));
+        }
+        
+        // Select border characters based on style
+        switch ($style) {
+            case 'double':
+                $hChar = '═';
+                $vChar = '║';
+                $tlChar = '╔';
+                $trChar = '╗';
+                $blChar = '╚';
+                $brChar = '╝';
+                break;
+            case 'fancy':
+                $hChar = '─';
+                $vChar = '│';
+                $tlChar = '╭';
+                $trChar = '╮';
+                $blChar = '╰';
+                $brChar = '╯';
+                break;
+            case 'simple':
+            default:
+                $hChar = '─';
+                $vChar = '│';
+                $tlChar = '┌';
+                $trChar = '┐';
+                $blChar = '└';
+                $brChar = '┘';
+                break;
+        }
+        
+        // Create top and bottom borders
+        $topBorder = $tlChar . str_repeat($hChar, $maxLength + 2) . $trChar;
+        $bottomBorder = $blChar . str_repeat($hChar, $maxLength + 2) . $brChar;
+        
+        // Create the framed text
+        $result = [$topBorder];
+        foreach ($lines as $line) {
+            $visibleLine = preg_replace('/\033\[[0-9;]*m/', '', $line);
+            $padding = $maxLength - mb_strlen($visibleLine);
+            $result[] = $vChar . ' ' . $line . str_repeat(' ', $padding) . ' ' . $vChar;
+        }
+        $result[] = $bottomBorder;
+        
+        return implode("\n", $result);
+    }
 }
