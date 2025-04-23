@@ -663,6 +663,22 @@ function displayScene($scene_data, $generate_image_toggle = true, $imageHandler 
     //    e. Add decorative flourishes
     //    f. Center the entire block in the terminal
     
+    // Get terminal width and determine appropriate formatting
+    $terminalWidth = Utils::getTerminalWidth();
+    $desired_width = 120; // Default desired width
+    
+    // If terminal is smaller than 140 chars, adjust formatting
+    if ($terminalWidth < 140) {
+        // Use narrower width based on terminal size, leave room for borders
+        $desired_width = max(60, $terminalWidth - 20);
+        $flourish_style = 'double'; // Use simpler double frame for smaller terminals
+        $padding_amount = 2; // Less padding for smaller terminals
+    } else {
+        $desired_width = 120; // Standard width for large terminals
+        $flourish_style = 'fancy'; // Ornate frame for large terminals
+        $padding_amount = 3; // Standard padding
+    }
+    
     // Start with a clean narrative without unwanted line breaks
     $clean_narrative = preg_replace('/\r\n|\r/', "\n", $raw_narrative);
     
@@ -670,14 +686,13 @@ function displayScene($scene_data, $generate_image_toggle = true, $imageHandler 
     $colorized_narrative = Utils::colorize($clean_narrative);
     
     // Apply proper paragraph wrapping (this preserves paragraphs and removes bad line breaks)
-    $wrapped_narrative = Utils::wrapText($colorized_narrative, 120);
+    // Use dynamically calculated width based on terminal size
+    $wrapped_narrative = Utils::wrapText($colorized_narrative, $desired_width);
     
     // Add padding to the text for a book-like feel (reduced padding since we're adding borders)
-    $padded_narrative = Utils::addTextPadding($wrapped_narrative, 3, 3);
+    $padded_narrative = Utils::addTextPadding($wrapped_narrative, $padding_amount, $padding_amount);
     
-    // Add decorative flourishes around the text (can be 'simple', 'double', 'rounded', or 'fancy')
-    // Using 'fancy' for the super ornate style with decorative elements
-    $flourish_style = 'fancy'; // Choose the style you prefer
+    // Add decorative flourishes around the text (style determined by terminal width)
     $decorated_narrative = Utils::addTextFlourishes($padded_narrative, $flourish_style);
     
     // Center the entire text block in the terminal

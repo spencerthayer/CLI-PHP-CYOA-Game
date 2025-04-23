@@ -239,20 +239,18 @@ class Utils {
                 $brChar = '╯';
                 break;
             case 'fancy':
-                // Super ornate fancy border inspired by vintage ANSI art
+                // Super ornate fancy border inspired by vintage ANSI art with muted gray colors for grimdark theme
                 $colorCodes = [
-                    'red' => "\033[31m", 
-                    'green' => "\033[32m", 
-                    'yellow' => "\033[33m", 
-                    'blue' => "\033[34m", 
-                    'magenta' => "\033[35m", 
-                    'cyan' => "\033[36m",
-                    'bright_red' => "\033[91m",
-                    'bright_green' => "\033[92m",
-                    'bright_yellow' => "\033[93m",
-                    'bright_blue' => "\033[94m",
-                    'bright_magenta' => "\033[95m",
-                    'bright_cyan' => "\033[96m",
+                    // More muted, darker colors appropriate for a grimdark theme
+                    'dark_gray' => "\033[90m",
+                    'light_gray' => "\033[37m",
+                    'mid_gray' => "\033[2;37m", // Dimmed white/gray
+                    'dark_blue' => "\033[2;34m", // Dimmed blue
+                    'dark_cyan' => "\033[2;36m", // Dimmed cyan
+                    'dark_magenta' => "\033[2;35m", // Dimmed magenta
+                    'darker_gray' => "\033[30;1m", // Bright black
+                    'dark_red' => "\033[2;31m", // Dimmed red
+                    'muted_white' => "\033[2;97m", // Dimmed bright white 
                     'reset' => "\033[0m"
                 ];
                 
@@ -285,16 +283,16 @@ class Utils {
                 }
                 
                 // Generate side decorations
-                $left_decoration = $colorCodes['bright_blue'] . '⫷⟕' . $colorCodes['reset'];
-                $right_decoration = $colorCodes['bright_blue'] . '⟖⫸' . $colorCodes['reset'];
+                $left_decoration = $colorCodes['dark_blue'] . '⫷⟕' . $colorCodes['reset'];
+                $right_decoration = $colorCodes['dark_blue'] . '⟖⫸' . $colorCodes['reset'];
                 
                 // Create fancy top border
-                $top_border_decoration = $colorCodes['bright_red'] . $top_pattern . $colorCodes['reset'];
-                $top_border = $colorCodes['bright_magenta'] . $corner_tl . str_repeat($h_edge, $maxLength + 2) . $corner_tr . $colorCodes['reset'];
+                $top_border_decoration = $colorCodes['dark_gray'] . $top_pattern . $colorCodes['reset'];
+                $top_border = $colorCodes['dark_cyan'] . $corner_tl . str_repeat($h_edge, $maxLength + 2) . $corner_tr . $colorCodes['reset'];
                 
                 // Create fancy bottom border
-                $bottom_border = $colorCodes['bright_magenta'] . $corner_bl . str_repeat($h_edge, $maxLength + 2) . $corner_br . $colorCodes['reset'];
-                $bottom_border_decoration = $colorCodes['bright_red'] . $bottom_pattern . $colorCodes['reset'];
+                $bottom_border = $colorCodes['dark_cyan'] . $corner_bl . str_repeat($h_edge, $maxLength + 2) . $corner_br . $colorCodes['reset'];
+                $bottom_border_decoration = $colorCodes['dark_gray'] . $bottom_pattern . $colorCodes['reset'];
                 
                 // Create the framed text with ornate elements
                 $ornateResults = [$top_border_decoration, $top_border];
@@ -305,9 +303,9 @@ class Utils {
                     
                     // Add colorful side decorations and vertical borders
                     $ornateResults[] = $left_decoration . ' ' . 
-                                      $colorCodes['bright_magenta'] . $v_edge . $colorCodes['reset'] . 
+                                      $colorCodes['dark_cyan'] . $v_edge . $colorCodes['reset'] . 
                                       ' ' . $line . str_repeat(' ', $padding) . ' ' . 
-                                      $colorCodes['bright_magenta'] . $v_edge . $colorCodes['reset'] . 
+                                      $colorCodes['dark_cyan'] . $v_edge . $colorCodes['reset'] . 
                                       ' ' . $right_decoration;
                 }
                 
