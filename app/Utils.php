@@ -18,12 +18,61 @@ class Utils {
             '[bold]' => "\033[1m",
             '[/bold]' => "\033[22m",
         ];
-        $wrapped_text = self::wrapText($text);
-        return str_replace(array_keys($color_codes), array_values($color_codes), $wrapped_text);
+        // Apply the color codes
+        return str_replace(array_keys($color_codes), array_values($color_codes), $text);
     }
     
-    public static function wrapText($text, $width = 192) {
-        return wordwrap($text, $width, "\n", true);
+    /**
+     * Properly wrap text with ANSI color support
+     * @param string $text Text to wrap
+     * @param int $width Width to wrap at
+     * @return string Wrapped text
+     */
+    public static function wrapText($text, $width = 80) {
+        // First, normalize any existing newlines to avoid strange formatting
+        $text = str_replace(["\r\n", "\r"], "\n", $text);
+        
+        // Replace multiple spaces with single spaces (except after periods)
+        $text = preg_replace('/(?<!\.) +/', ' ', $text);
+        
+        // Split by existing paragraphs (empty lines)
+        $paragraphs = preg_split('/\n\s*\n/', $text, -1, PREG_SPLIT_NO_EMPTY);
+        $result = [];
+        
+        foreach ($paragraphs as $paragraph) {
+            // Remove existing single newlines within paragraphs
+            $paragraph = str_replace("\n", " ", $paragraph);
+            
+            // Trim excess whitespace
+            $paragraph = trim($paragraph);
+            
+            // Word wrap the paragraph
+            $wrapped = wordwrap($paragraph, $width, "\n", false);
+            $result[] = $wrapped;
+        }
+        
+        // Join with double newlines between paragraphs
+        return implode("\n\n", $result);
+    }
+    
+    /**
+     * Add padding to each line of text
+     * @param string $text The text to pad
+     * @param int $leftPadding Number of spaces for left padding
+     * @param int $rightPadding Number of spaces for right padding
+     * @return string Padded text
+     */
+    public static function addTextPadding($text, $leftPadding = 4, $rightPadding = 4) {
+        // Split text into lines
+        $lines = explode("\n", $text);
+        
+        // Add padding to each line
+        foreach ($lines as &$line) {
+            $line = str_repeat(' ', $leftPadding) . $line . str_repeat(' ', $rightPadding);
+        }
+        
+        // Rejoin lines
+        return implode("\n", $lines);
     }
     
     public static function showLoadingAnimation($context = null, $customMessage = null) {

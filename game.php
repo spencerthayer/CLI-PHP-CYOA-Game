@@ -655,9 +655,25 @@ function displayScene($scene_data, $generate_image_toggle = true, $imageHandler 
     // 1. Get the raw narrative
     $raw_narrative = $scene_data->narrative ?? '';
 
-    // 2. Prepare text for display: Colorize first, then wrap.
-    $colorized_narrative = Utils::colorize($raw_narrative); // Apply [color] tags -> ANSI codes
-    $display_narrative = Utils::wrapText($colorized_narrative); // Wrap text with ANSI codes
+    // 2. Process the narrative with proper formatting:
+    //    a. First strip any existing unwanted line breaks
+    //    b. Apply color codes
+    //    c. Apply proper paragraph wrapping
+    //    d. Add padding only to the narrative text
+    
+    // Start with a clean narrative without unwanted line breaks
+    $clean_narrative = preg_replace('/\r\n|\r/', "\n", $raw_narrative);
+    
+    // Apply color formatting
+    $colorized_narrative = Utils::colorize($clean_narrative);
+    
+    // Apply proper paragraph wrapping (this preserves paragraphs and removes bad line breaks)
+    $wrapped_narrative = Utils::wrapText($colorized_narrative, 68);
+    
+    // Finally add padding to give it a book-like feel
+    $display_narrative = Utils::addTextPadding($wrapped_narrative, 6, 6);
+    
+    // Display the formatted narrative
     echo "\n" . $display_narrative . "\n\n";
 
     // 3. Prepare text for audio: Strip [color] tags from raw text.
@@ -671,8 +687,6 @@ function displayScene($scene_data, $generate_image_toggle = true, $imageHandler 
         }
         $audioHandler->speakNarrative($text_for_audio);
     }
-
-    // --- End Corrected Narrative Handling ---
 
     // Display options
     echo Utils::colorize("\n[bold]Choose your next action:[/bold]\n");
