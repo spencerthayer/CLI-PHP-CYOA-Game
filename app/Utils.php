@@ -239,22 +239,80 @@ class Utils {
                 $brChar = '╯';
                 break;
             case 'fancy':
-                // Super ornate fancy border
-                $topBorder = '╔' . str_repeat('═', $maxLength + 2) . '╗';
-                $bottomBorder = '╚' . str_repeat('═', $maxLength + 2) . '╝';
+                // Super ornate fancy border inspired by vintage ANSI art
+                $colorCodes = [
+                    'red' => "\033[31m", 
+                    'green' => "\033[32m", 
+                    'yellow' => "\033[33m", 
+                    'blue' => "\033[34m", 
+                    'magenta' => "\033[35m", 
+                    'cyan' => "\033[36m",
+                    'bright_red' => "\033[91m",
+                    'bright_green' => "\033[92m",
+                    'bright_yellow' => "\033[93m",
+                    'bright_blue' => "\033[94m",
+                    'bright_magenta' => "\033[95m",
+                    'bright_cyan' => "\033[96m",
+                    'reset' => "\033[0m"
+                ];
+                
+                // Decorative elements
+                $decorative_chars = ['⩢', '⩕', '⩓', '⩔', '⩖', '⩠'];
+                $corner_tl = '╔';
+                $corner_tr = '╗';
+                $corner_bl = '╚';
+                $corner_br = '╝';
+                $h_edge = '═';
+                $v_edge = '║';
+                
+                // Create colorful top decoration
+                $top_pattern = '';
+                $pattern_length = $maxLength + 4;
+                for ($i = 0; $i < $pattern_length; $i++) {
+                    $char_index = $i % count($decorative_chars);
+                    $color_index = $i % 6; // Cycle through 6 colors
+                    $color = array_values($colorCodes)[$color_index];
+                    $top_pattern .= $color . $decorative_chars[$char_index] . $colorCodes['reset'];
+                }
+                
+                // Build the bottom pattern similarly but with different colors
+                $bottom_pattern = '';
+                for ($i = 0; $i < $pattern_length; $i++) {
+                    $char_index = ($i + 3) % count($decorative_chars); // Offset for variation
+                    $color_index = (5 - ($i % 6)); // Reverse color order
+                    $color = array_values($colorCodes)[$color_index];
+                    $bottom_pattern .= $color . $decorative_chars[$char_index] . $colorCodes['reset'];
+                }
+                
+                // Generate side decorations
+                $left_decoration = $colorCodes['bright_blue'] . '⫷⟕' . $colorCodes['reset'];
+                $right_decoration = $colorCodes['bright_blue'] . '⟖⫸' . $colorCodes['reset'];
+                
+                // Create fancy top border
+                $top_border_decoration = $colorCodes['bright_red'] . $top_pattern . $colorCodes['reset'];
+                $top_border = $colorCodes['bright_magenta'] . $corner_tl . str_repeat($h_edge, $maxLength + 2) . $corner_tr . $colorCodes['reset'];
+                
+                // Create fancy bottom border
+                $bottom_border = $colorCodes['bright_magenta'] . $corner_bl . str_repeat($h_edge, $maxLength + 2) . $corner_br . $colorCodes['reset'];
+                $bottom_border_decoration = $colorCodes['bright_red'] . $bottom_pattern . $colorCodes['reset'];
                 
                 // Create the framed text with ornate elements
-                $ornateResults = ["\033[33m" . '┏━━' . str_repeat('❧', ceil(($maxLength - 10) / 2)) . ' TALE ' . str_repeat('❧', floor(($maxLength - 10) / 2)) . '━━┓' . "\033[0m"];
-                $ornateResults[] = $topBorder;
+                $ornateResults = [$top_border_decoration, $top_border];
                 
                 foreach ($lines as $line) {
                     $visibleLine = preg_replace('/\033\[[0-9;]*m/', '', $line);
                     $padding = $maxLength - mb_strlen($visibleLine);
-                    $ornateResults[] = '║ ' . $line . str_repeat(' ', $padding) . ' ║';
+                    
+                    // Add colorful side decorations and vertical borders
+                    $ornateResults[] = $left_decoration . ' ' . 
+                                      $colorCodes['bright_magenta'] . $v_edge . $colorCodes['reset'] . 
+                                      ' ' . $line . str_repeat(' ', $padding) . ' ' . 
+                                      $colorCodes['bright_magenta'] . $v_edge . $colorCodes['reset'] . 
+                                      ' ' . $right_decoration;
                 }
                 
-                $ornateResults[] = $bottomBorder;
-                $ornateResults[] = "\033[33m" . '┗━━' . str_repeat('❧', floor($maxLength / 2)) . str_repeat('━', $maxLength % 2) . str_repeat('❧', floor($maxLength / 2)) . '━━┛' . "\033[0m";
+                $ornateResults[] = $bottom_border;
+                $ornateResults[] = $bottom_border_decoration;
                 
                 return implode("\n", $ornateResults);
                 
