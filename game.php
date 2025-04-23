@@ -668,7 +668,7 @@ function displayScene($scene_data, $generate_image_toggle = true, $imageHandler 
     $colorized_narrative = Utils::colorize($clean_narrative);
     
     // Apply proper paragraph wrapping (this preserves paragraphs and removes bad line breaks)
-    $wrapped_narrative = Utils::wrapText($colorized_narrative, 68);
+    $wrapped_narrative = Utils::wrapText($colorized_narrative, 120);
     
     // Finally add padding to give it a book-like feel
     $display_narrative = Utils::addTextPadding($wrapped_narrative, 6, 6);

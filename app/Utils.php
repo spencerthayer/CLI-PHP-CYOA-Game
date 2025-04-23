@@ -28,7 +28,7 @@ class Utils {
      * @param int $width Width to wrap at
      * @return string Wrapped text
      */
-    public static function wrapText($text, $width = 80) {
+    public static function wrapText($text, $width = 120) {
         // First, normalize any existing newlines to avoid strange formatting
         $text = str_replace(["\r\n", "\r"], "\n", $text);
         
