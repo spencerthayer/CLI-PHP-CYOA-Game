@@ -207,7 +207,7 @@ class Utils {
     /**
      * Add decorative flourishes around a text block
      * @param string $text Text to decorate
-     * @param string $style Style of decoration ('simple', 'double', 'fancy')
+     * @param string $style Style of decoration ('simple', 'double', 'rounded', 'fancy')
      * @return string Decorated text
      */
     public static function addTextFlourishes($text, $style = 'simple') {
@@ -230,7 +230,7 @@ class Utils {
                 $blChar = '╚';
                 $brChar = '╝';
                 break;
-            case 'fancy':
+            case 'rounded':
                 $hChar = '─';
                 $vChar = '│';
                 $tlChar = '╭';
@@ -238,6 +238,26 @@ class Utils {
                 $blChar = '╰';
                 $brChar = '╯';
                 break;
+            case 'fancy':
+                // Super ornate fancy border
+                $topBorder = '╔' . str_repeat('═', $maxLength + 2) . '╗';
+                $bottomBorder = '╚' . str_repeat('═', $maxLength + 2) . '╝';
+                
+                // Create the framed text with ornate elements
+                $ornateResults = ["\033[33m" . '┏━━' . str_repeat('❧', ceil(($maxLength - 10) / 2)) . ' TALE ' . str_repeat('❧', floor(($maxLength - 10) / 2)) . '━━┓' . "\033[0m"];
+                $ornateResults[] = $topBorder;
+                
+                foreach ($lines as $line) {
+                    $visibleLine = preg_replace('/\033\[[0-9;]*m/', '', $line);
+                    $padding = $maxLength - mb_strlen($visibleLine);
+                    $ornateResults[] = '║ ' . $line . str_repeat(' ', $padding) . ' ║';
+                }
+                
+                $ornateResults[] = $bottomBorder;
+                $ornateResults[] = "\033[33m" . '┗━━' . str_repeat('❧', floor($maxLength / 2)) . str_repeat('━', $maxLength % 2) . str_repeat('❧', floor($maxLength / 2)) . '━━┛' . "\033[0m";
+                
+                return implode("\n", $ornateResults);
+                
             case 'simple':
             default:
                 $hChar = '─';
@@ -247,6 +267,11 @@ class Utils {
                 $blChar = '└';
                 $brChar = '┘';
                 break;
+        }
+        
+        // Early return for fancy style which builds its own result
+        if ($style === 'fancy') {
+            return;  // We already returned in the switch case
         }
         
         // Create top and bottom borders

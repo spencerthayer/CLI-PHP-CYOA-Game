@@ -675,7 +675,8 @@ function displayScene($scene_data, $generate_image_toggle = true, $imageHandler 
     // Add padding to the text for a book-like feel (reduced padding since we're adding borders)
     $padded_narrative = Utils::addTextPadding($wrapped_narrative, 3, 3);
     
-    // Add decorative flourishes around the text (can be 'simple', 'double', or 'fancy')
+    // Add decorative flourishes around the text (can be 'simple', 'double', 'rounded', or 'fancy')
+    // Using 'fancy' for the super ornate style with decorative elements
     $flourish_style = 'fancy'; // Choose the style you prefer
     $decorated_narrative = Utils::addTextFlourishes($padded_narrative, $flourish_style);
     
