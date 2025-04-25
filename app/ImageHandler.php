@@ -5,10 +5,12 @@ namespace App;
 class ImageHandler {
     private $config;
     private $debug;
+    private $useChunky;
     
-    public function __construct($config, $debug = false) {
+    public function __construct($config, $debug = false, $useChunky = false) {
         $this->config = $config;
         $this->debug = $debug;
+        $this->useChunky = $useChunky;
     }
     
     /**
@@ -205,9 +207,19 @@ class ImageHandler {
 
         if ($this->debug) {
             echo "[DEBUG] Generating ASCII art from image at: $image_path\n";
+            if ($this->useChunky) {
+                echo "[DEBUG] Using Chunky ASCII converter\n";
+            } else {
+                echo "[DEBUG] Using standard ASCII converter\n";
+            }
         }
         
-        $converter = new AsciiArtConverter($this->config);
+        if ($this->useChunky) {
+            $converter = new ChunkyAsciiArtConverter($this->config, 8, true, true);
+        } else {
+            $converter = new AsciiArtConverter($this->config);
+        }
+        
         $result = $converter->convertImage($image_path);
         return $result !== false ? $result : null;
     }

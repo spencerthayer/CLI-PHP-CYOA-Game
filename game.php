@@ -40,6 +40,9 @@ use App\AudioHandler;
 // Check if debug mode is enabled
 $debug = in_array('--debug', $argv);
 
+// Check if Chunky ASCII mode is enabled
+$useChunky = in_array('--chunky', $argv);
+
 // Function to get the API key
 function get_api_key($api_key_file) {
     $data_dir = dirname($api_key_file);
@@ -108,11 +111,22 @@ foreach ($data_dir_paths as $file_path) {
 $gameState = new GameState($config, $debug);
 write_debug_log("GameState initialized", ['config' => $config, 'debug' => $debug]);
 
-$imageHandler = new ImageHandler($config, $debug);
-write_debug_log("ImageHandler initialized");
+$imageHandler = new ImageHandler($config, $debug, $useChunky);
+write_debug_log("ImageHandler initialized", ['useChunky' => $useChunky ? 'true' : 'false']);
 
 $audioHandler = new AudioHandler($config, $debug);
 write_debug_log("AudioHandler initialized");
+
+// Display the welcome message with chunky flag info if in debug mode
+if ($debug) {
+    echo "[DEBUG] Game initialized with options:";
+    echo " debug=" . ($debug ? "true" : "false");
+    echo " chunky=" . ($useChunky ? "true" : "false") . "\n";
+    
+    if ($useChunky) {
+        echo "[DEBUG] Using Chunky ASCII art mode for enhanced visual output\n";
+    }
+}
 
 // Test audio generation (DEBUG ONLY)
 if ($debug) {
@@ -147,10 +161,23 @@ if (in_array('--new', $argv)) {
         unlink($config['paths']['debug_log_file']);
     }
     
+    // Display information about Chunky ASCII mode if it's enabled
+    if ($useChunky) {
+        echo Utils::colorize("\n[green]Chunky ASCII art mode is enabled for enhanced visuals![/green]\n");
+    }
+    
     // Display title screen
     $title_art = $imageHandler->generate1Screen();
     if ($title_art) {
         echo "\n" . $title_art . "\n\n";
+    }
+    
+    // Display the game's startup message
+    echo Utils::colorize("\n[bold][cyan]Welcome to 'The Dying Earth'![/cyan][/bold]\n");
+    echo Utils::colorize("(Type 'exit' or 'quit' to end the game at any time.)\n");
+    
+    if (!$useChunky) {
+        echo Utils::colorize("\n[yellow]TIP: You can use --chunky flag for enhanced ASCII art! Restart with: php game.php --chunky[/yellow]\n\n");
     }
     
     $imageHandler->clearImages();
@@ -323,10 +350,23 @@ while (true) {
                     }
                     echo "Starting a new game...\n";
                     
+                    // Display information about Chunky ASCII mode if it's enabled
+                    if ($useChunky) {
+                        echo Utils::colorize("\n[green]Chunky ASCII art mode is enabled for enhanced visuals![/green]\n");
+                    }
+                    
                     // Generate and display the title screen
                     $title_screen = $imageHandler->generate1Screen();
                     if ($title_screen) {
                         echo $title_screen . "\n";
+                    }
+                    
+                    // Display the game's startup message
+                    echo Utils::colorize("\n[bold][cyan]Welcome to 'The Dying Earth'![/cyan][/bold]\n");
+                    echo Utils::colorize("(Type 'exit' or 'quit' to end the game at any time.)\n");
+                    
+                    if (!$useChunky) {
+                        echo Utils::colorize("\n[yellow]TIP: You can use --chunky flag for enhanced ASCII art! Restart with: php game.php --chunky[/yellow]\n\n");
                     }
                     
                     $imageHandler->clearImages();

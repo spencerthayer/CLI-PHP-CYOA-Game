@@ -62,7 +62,7 @@ class AsciiArtConverter {
         return $this->processImage($img, $width, $height);
     }
     
-    private function getTerminalSize() {
+    protected function getTerminalSize() {
         $size = [];
         
         if (PHP_OS_FAMILY === 'Windows') {
@@ -96,7 +96,7 @@ class AsciiArtConverter {
         return $size;
     }
     
-    private function processImage($img, $width, $height) {
+    protected function processImage($img, $width, $height) {
         $ascii_art = "";
         $scale = 1.25;
         $char_aspect = 2.5;
@@ -145,7 +145,7 @@ class AsciiArtConverter {
         return $ascii_art;
     }
     
-    private function resizeImage($img, $width, $height, $orig_width, $orig_height) {
+    protected function resizeImage($img, $width, $height, $orig_width, $orig_height) {
         $resized = imagecreatetruecolor($width, $height);
         
         // Preserve transparency for PNG/GIF
@@ -159,7 +159,7 @@ class AsciiArtConverter {
         return $resized;
     }
     
-    private function getAnsiColorPalette() {
+    protected function getAnsiColorPalette() {
         $colors = [];
 
         // Standard colors (0–15)
@@ -192,7 +192,7 @@ class AsciiArtConverter {
         return array_merge($base_colors, $colors);
     }
     
-    private function findClosestAnsiColor($r, $g, $b, $ansi_lab_palette) {
+    protected function findClosestAnsiColor($r, $g, $b, $ansi_lab_palette) {
         $lab1 = $this->rgb2lab($r, $g, $b);
         $closest = 0;
         $min_distance = PHP_FLOAT_MAX;
@@ -208,12 +208,12 @@ class AsciiArtConverter {
         return $closest;
     }
     
-    private function rgb2lab($r, $g, $b) {
+    protected function rgb2lab($r, $g, $b) {
         list($x, $y, $z) = $this->rgb2xyz($r, $g, $b);
         return $this->xyz2lab($x, $y, $z);
     }
     
-    private function rgb2xyz($r, $g, $b) {
+    protected function rgb2xyz($r, $g, $b) {
         $r = $r / 255;
         $g = $g / 255;
         $b = $b / 255;
@@ -238,7 +238,7 @@ class AsciiArtConverter {
         ];
     }
     
-    private function xyz2lab($x, $y, $z) {
+    protected function xyz2lab($x, $y, $z) {
         $ref_X = 95.047;
         $ref_Y = 100.000;
         $ref_Z = 108.883;
@@ -263,7 +263,7 @@ class AsciiArtConverter {
         ];
     }
     
-    private function labDistance($lab1, $lab2) {
+    protected function labDistance($lab1, $lab2) {
         return sqrt(
             pow($lab1[0] - $lab2[0], 2) +
             pow($lab1[1] - $lab2[1], 2) +
@@ -271,7 +271,7 @@ class AsciiArtConverter {
         );
     }
     
-    private function applyGamma($luminance, $gamma = 1.2) {
+    protected function applyGamma($luminance, $gamma = 1.2) {
         return pow($luminance, 0.2 / $gamma);
     }
 } 

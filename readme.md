@@ -161,6 +161,16 @@ php game.php
   php game.php --new --debug
   ```
 
+- **Enable Chunky Mode**
+
+  To use the Chunky ASCII Art Converter, use the `--chunky` flag:
+
+  ```bash
+  php game.php --chunky
+  ```
+
+  - This will use the Chunky font's rich character set to render game images with more detailed and visually appealing ASCII art.
+
 ---
 
 ## Gameplay Instructions
@@ -481,6 +491,26 @@ Save output to a file:
 ```bash
 chunky image.png -o output.txt
 ```
+
+## Integration with "The Quest of the Forgotten Realm" Game
+
+The Chunky ASCII Art Converter can be used to enhance the visuals in "The Quest of the Forgotten Realm" game. To enable Chunky mode:
+
+```bash
+php game.php --chunky
+```
+
+You can combine this with other game flags:
+
+```bash
+php game.php --chunky --new
+```
+
+```bash
+php game.php --chunky --debug
+```
+
+This will use the Chunky font's rich character set to render game images with more detailed and visually appealing ASCII art.
 
 ## How It Works
 
