@@ -388,3 +388,149 @@ This project is licensed under the [MIT License](LICENSE). You are free to use, 
 - **Inspiration:** Cascadia PHP 2024
 
 Thank you to all the participants and organizers of Cascadia PHP 2024 for fostering a community of innovation and collaboration. Your support made this project possible!
+
+# Chunky ASCII Art Converter
+
+A PHP command-line tool that converts images into ASCII art using characters from the Chunky font.
+
+## Features
+
+- Converts images to terminal-friendly ASCII art
+- Uses the Chunky font's extensive character set (366 characters)
+- Supports color output with ANSI terminal colors
+- Adaptive block sizing for different image types
+- Multiple resolution options
+- **NEW**: Density-based character mapping for accurate visual representation
+
+## Requirements
+
+- PHP 8.0 or higher
+- PHP GD extension
+- Terminal with ANSI color support
+
+## Installation
+
+1. Clone or download this repository
+2. Make sure you have PHP and the GD extension installed
+3. Run the tool from the command line
+
+### Quick Setup (Unix/Linux/macOS)
+
+For a more convenient experience, you can add the `bin` directory to your PATH:
+
+```bash
+# Add this to your .bashrc, .zshrc, or equivalent shell configuration file
+export PATH="/path/to/chunky/bin:$PATH"
+```
+
+Then, you can run the tool simply by typing `chunky` from anywhere:
+
+```bash
+chunky image.png -a
+```
+
+## Usage
+
+```bash
+php chunky.php <image_file> [options]
+```
+
+Or using the bash wrapper (if installed):
+
+```bash
+chunky <image_file> [options]
+```
+
+### Options
+
+- `-b, --block-size <size>` - Size of image blocks (default: 8)
+- `-s, --simple` - Use simple character set (only basic block characters)
+- `-a, --adaptive` - Use adaptive block sizing based on image content
+- `-c, --categorized` - Use categorized characters instead of density-sorted
+- `-o, --output <file>` - Save output to file instead of terminal
+- `-h, --help` - Display help message
+
+### Examples
+
+Convert an image using default settings (with density-based character selection):
+```bash
+chunky image.png
+```
+
+Convert an image with smaller block size (more detail):
+```bash
+chunky image.png -b 4
+```
+
+Use adaptive block sizing for improved detail in complex areas:
+```bash
+chunky image.png -a
+```
+
+Use traditional categorized character selection instead of density-based:
+```bash
+chunky image.png -c
+```
+
+Use simple character set (less detailed but more compatible):
+```bash
+chunky image.png -s
+```
+
+Save output to a file:
+```bash
+chunky image.png -o output.txt
+```
+
+## How It Works
+
+The Chunky ASCII Art Converter analyzes each region of the input image and maps it to an appropriate character from the Chunky font using two possible methods:
+
+### 1. Density-Based Character Selection (Default)
+
+The converter uses characters sorted by their actual pixel density from the Chunky font:
+- The tool analyzes the actual 8×8 pixel patterns of each character in the font
+- Characters are sorted from least dense (fewest pixels) to most dense (most pixels)
+- Image brightness is directly mapped to this density scale
+- This provides the most accurate visual representation of the original image
+
+### 2. Categorized Character Selection
+
+Alternatively, the converter can use a more traditional approach:
+- Characters are manually categorized by their visual properties
+- Image regions are analyzed for brightness, edges, and texture
+- Special characters are used for specific features (box drawing for edges, etc.)
+- This can be enabled with the `-c` or `--categorized` flag
+
+The converter also uses ANSI color codes to preserve color information from the original image.
+
+## Character Density Analysis
+
+The first time you run the tool with density-based selection, it will automatically analyze the Chunky font characters and sort them by pixel density. This analysis:
+
+1. Examines the 8×8 pixel grid for each character in the font
+2. Counts the number of "on" pixels in each character
+3. Sorts the entire 366-character set from least dense to most dense
+4. Saves this mapping to `app/chunky_density_sorted.php` for future use
+
+## About Chunky Font
+
+Chunky is an 8×8 pixel TTF textmode font created by Batfeula, featuring 366 characters including:
+- ASCII characters
+- Box drawing characters
+- Block elements
+- Special symbols
+- Greek letters
+- Math symbols
+- And more!
+
+This tool respects the Chunky font license and only uses the character mappings for ASCII art conversion.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Batfeula for creating the awesome Chunky font
+- The PHP GD development team

@@ -1,0 +1,29 @@
+#!/bin/bash
+#
+# Chunky - ASCII Art image converter using the Chunky font
+#
+# This is a wrapper script around chunky.php that makes it easier to use.
+# It handles common paths and provides a simpler command-line interface.
+
+# Determine the script directory regardless of how it's called
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+BASE_DIR="$( dirname "$SCRIPT_DIR" )"
+
+# The PHP script path
+CHUNKY_PHP="$BASE_DIR/chunky.php"
+
+# Check if PHP is installed
+if ! command -v php &> /dev/null; then
+    echo "Error: PHP is not installed or not in the PATH."
+    echo "Please install PHP to use this tool."
+    exit 1
+fi
+
+# Check if the GD extension is loaded
+if ! php -m | grep -q "gd"; then
+    echo "Warning: PHP GD extension may not be installed."
+    echo "The Chunky converter requires the GD extension for image processing."
+fi
+
+# Forward all arguments to the PHP script
+php "$CHUNKY_PHP" "$@" 
