@@ -73,9 +73,9 @@ Before you begin, ensure you have met the following requirements:
     ```
   - If PHP is not installed, download it from the [official website](https://www.php.net/downloads.php) or use a package manager.
 
-- An **OpenAI API Key**.
-  - Sign up at [OpenAI's website](https://platform.openai.com/signup/) if you don't have an account.
-  - Generate an API key from your [API keys page](https://platform.openai.com/account/api-keys).
+- An **API Key** from one of the supported AI providers:
+  - **OpenAI**: Sign up at [OpenAI's website](https://platform.openai.com/signup/) and generate an API key from your [API keys page](https://platform.openai.com/account/api-keys).
+  - **OpenRouter**: Sign up at [OpenRouter's website](https://openrouter.ai/) and generate an API key from your [keys page](https://openrouter.ai/keys).
 
 - **Git** installed (optional, for cloning the repository).
   - Check if Git is installed by running:
@@ -133,24 +133,52 @@ php game.php
 
 **First-Time Setup:**
 
-- Upon the first run, you'll be prompted to enter your OpenAI API key:
+- Upon the first run, you'll be prompted to configure your AI provider:
 
-  ```
-  Please enter your OpenAI API key:
-  ```
+  1. **Select your AI provider** (OpenAI or OpenRouter)
+  2. **Enter your API key** for the selected provider
+  3. **Choose your preferred model** from the available options
 
-  - Paste your API key and press **Enter**.
-  - The API key will be saved securely in a hidden file named `data/.openai_api_key` with permissions set to `0600` (readable and writable only by you).
+  The configuration will be saved securely with permissions set to `0600` (readable and writable only by you).
 
 **Subsequent Runs:**
 
-- The script will automatically use the saved API key without prompting.
+- The script will automatically use your saved configuration without prompting.
 
 ### Command-Line Options
 
+- **Configure AI Provider**
+
+  To configure or change your AI provider and model:
+
+  ```bash
+  php game.php --setup
+  ```
+
+  - This will launch the interactive setup wizard to select your provider, enter your API key, and choose your model.
+
+- **Display Current Configuration**
+
+  To view your current AI provider configuration:
+
+  ```bash
+  php game.php --config
+  ```
+
+- **Refresh OpenRouter Models**
+
+  To clear the cached model list and fetch fresh models on next setup:
+
+  ```bash
+  php game.php --refresh-models
+  ```
+
+  - OpenRouter's model list is cached for 1 hour to improve performance
+  - Use this if you want to see the very latest models immediately
+
 - **Start a New Game**
 
-  To start a new game and clear any existing game history, use the `--new` flag:
+  To start a new game and clear any existing game history:
 
   ```bash
   php game.php --new
@@ -160,31 +188,39 @@ php game.php
 
 - **Enable Debugging**
 
-  For detailed debug logs, use the `--debug` flag:
+  For detailed debug logs:
 
   ```bash
   php game.php --debug
   ```
 
-  - This will display internal processing messages in the console and write detailed logs to `data/debug_log.txt`, helpful for troubleshooting or understanding the game's operations.
-
-- **Combine Flags**
-
-  You can combine both flags as needed:
-
-  ```bash
-  php game.php --new --debug
-  ```
+  - This will display internal processing messages in the console and write detailed logs to `data/debug_log.txt`.
 
 - **Enable Chunky Mode**
 
-  To use the Chunky ASCII Art Converter, use the `--chunky` flag:
+  To use the Chunky ASCII Art Converter:
 
   ```bash
   php game.php --chunky
   ```
 
-  - This will use the Chunky font's rich character set to render game images with more detailed and visually appealing ASCII art.
+  - This will use the Chunky font's rich character set to render game images with more detailed ASCII art.
+
+- **Display Help**
+
+  To see all available options:
+
+  ```bash
+  php game.php --help
+  ```
+
+- **Combine Flags**
+
+  You can combine multiple flags as needed:
+
+  ```bash
+  php game.php --new --debug --chunky
+  ```
 
 ---
 
@@ -284,22 +320,152 @@ Success or failure in these rolls determines the outcome of your actions and how
 
 ---
 
+## Migration Guide for Existing Users
+
+### Automatic Migration
+
+If you've been using the game with the old OpenAI-only configuration:
+
+```bash
+php migrate.php
+```
+
+This will guide you through migrating your existing configuration to the new multi-provider system.
+
+### Manual Setup
+
+If you prefer to set up manually:
+
+**To continue using OpenAI:**
+1. Run `php game.php` - you'll be prompted to set up your provider
+2. Select **OpenAI** as your provider
+3. Enter your existing OpenAI API key
+4. Select your preferred model (GPT-4o Mini is recommended for balance of cost and performance)
+
+**To switch to OpenRouter for access to more models:**
+1. Get an API key from [OpenRouter](https://openrouter.ai/keys)
+2. Run `php game.php --setup`
+3. Select **OpenRouter** as your provider
+4. Enter your OpenRouter API key
+5. Choose from 200+ available models
+
+Your game history and saves will be preserved when switching providers.
+
+---
+
+## AI Provider Options
+
+### OpenAI
+
+Direct access to OpenAI's models including GPT-4o and GPT-3.5 Turbo.
+
+**Available Models:**
+- GPT-4o (Most capable)
+- GPT-4o Mini (Fast and affordable)  
+- GPT-4 Turbo (Legacy)
+- GPT-3.5 Turbo (Legacy, fast)
+
+### OpenRouter
+
+Access to **400+ models** from multiple AI providers through a unified API, including **many FREE models**!
+
+**Key Providers Include:**
+- **OpenAI**: All GPT models
+- **Anthropic**: Claude 3.5 Sonnet, Claude 3 Opus/Sonnet/Haiku
+- **Google**: Gemini Pro 1.5, Gemini Flash, Gemma models
+- **Meta**: Llama 3.3 70B, Llama 3.1 405B/70B/8B
+- **Mistral**: Mistral Large, Mixtral, Codestral
+- **xAI**: Grok Beta
+- **DeepSeek**: DeepSeek Chat, DeepSeek Coder
+- **Cognitive Computations**: Venice (Uncensored models)
+- **Qwen**: Qwen 2.5 models
+- **Nous Research**: Hermes models
+- And 50+ more providers!
+
+**🆓 FREE Models Available:**
+OpenRouter offers numerous free models perfect for testing and development:
+- **Venice Dolphin Mistral** (Default) - Uncensored, creative writing focused
+- Models from Google, Meta, Mistral, and more with `:free` variants
+- No API costs for these models (rate limits apply)
+- Type `free` during setup to see all free options
+
+**Dynamic Model Selection:**
+When you select OpenRouter during setup, the game automatically fetches the latest list of available models from OpenRouter's API. This ensures you always have access to the newest models without needing to update the game.
+
+**Model Information Display:**
+Each model shows helpful context:
+- **🆓 FREE**: Clearly marked free models
+- **Pricing tier**: $, $$, or $$$ for paid models
+- **Context window**: For models with large context (e.g., "128k ctx")
+- **Capabilities**: Vision, Audio, Functions support
+- **Provider**: Organized by provider for easy browsing
+
+**Setup Commands:**
+- Type `more` to see all 400+ models
+- Type `free` to see only free models
+- Enter partial model names for search
+- Direct model ID entry supported
+
+**Benefits of OpenRouter:**
+- **Start for FREE** - Many models available at no cost
+- Access to 400+ models through a single API key
+- Real-time model availability - new models appear automatically
+- Automatic fallback to alternative providers if one is unavailable
+- Competitive pricing across different models
+- No need for multiple API keys from different providers
+
+---
+
 ## Security Considerations
 
 - **API Key Storage**
 
-  - Your OpenAI API key is stored in a hidden file named `data/.openai_api_key` in the project directory.
-  - The file permissions are set to `0600`, making it readable and writable only by your user account.
+  - Your API key is stored in a hidden file named `.data/.api_key` in the project directory.
+  - Provider configuration is stored in `.data/.provider_config`.
+  - Both files have permissions set to `0600`, making them readable and writable only by your user account.
   - **Do Not Share:** Never share your API key or commit it to any public repository.
 
 - **Protecting Your API Key**
 
-  - **Revoking Access:** If you believe your API key has been compromised, revoke it immediately from your OpenAI account settings.
+  - **Revoking Access:** 
+    - For OpenAI: Revoke keys from your [OpenAI account settings](https://platform.openai.com/account/api-keys)
+    - For OpenRouter: Revoke keys from your [OpenRouter keys page](https://openrouter.ai/keys)
 
 - **File Permissions**
 
   - Ensure that the project directory is secure and not accessible by unauthorized users.
   - Verify file permissions if you're running the script on a shared system.
+
+---
+
+## Testing Your Configuration
+
+After setting up your AI provider, you can test the connection:
+
+```bash
+php test_providers.php
+```
+
+This will:
+- Verify your API key is valid
+- Test connectivity to your selected provider
+- Check if your selected model is available
+- Test function calling support
+
+## Exploring Available Models
+
+To see all available models from OpenRouter:
+
+```bash
+php fetch_models.php
+```
+
+This utility:
+- Fetches the complete list of 400+ models from OpenRouter
+- Shows models organized by provider
+- Displays pricing and capability information
+- Optionally generates a configuration file with all models
+- Works without requiring an API key
 
 ---
 
@@ -368,14 +534,12 @@ Success or failure in these rolls determines the outcome of your actions and how
 
 - **Using a Different Model**
 
-  - In `app/config.php`, change the `model` under the `api` key:
-    ```php
-    'api' => [
-        // ... other settings
-        'model' => 'gpt-4', // Or another available model
-        // ...
-    ],
+  - Run the setup wizard to change your model:
+    ```bash
+    php game.php --setup
     ```
+  - Or manually edit `.data/.provider_config` to change the model.
+  - You can also add new models to `app/config.php` in the providers section.
 
 - **Enhancing ASCII Art Quality**
 

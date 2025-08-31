@@ -43,18 +43,20 @@ $debug = in_array('--debug', $argv);
 $useChunky = in_array('--chunky', $argv);
 $setupProvider = in_array('--setup', $argv);
 $showConfig = in_array('--config', $argv);
+$refreshModels = in_array('--refresh-models', $argv);
 
 // Function to display help message
 function displayHelp() {
     echo Utils::colorize("\n[bold][cyan]The Dying Earth - Command Line Options[/cyan][/bold]\n\n");
     echo Utils::colorize("[green]Usage:[/green] php game.php [options]\n\n");
     echo Utils::colorize("[yellow]Options:[/yellow]\n");
-    echo Utils::colorize("  [cyan]--new[/cyan]      Start a new game\n");
-    echo Utils::colorize("  [cyan]--debug[/cyan]    Enable debug mode\n");
-    echo Utils::colorize("  [cyan]--chunky[/cyan]   Use Chunky ASCII art mode\n");
-    echo Utils::colorize("  [cyan]--setup[/cyan]    Configure AI provider and model\n");
-    echo Utils::colorize("  [cyan]--config[/cyan]   Display current configuration\n");
-    echo Utils::colorize("  [cyan]--help[/cyan]     Show this help message\n\n");
+    echo Utils::colorize("  [cyan]--new[/cyan]             Start a new game\n");
+    echo Utils::colorize("  [cyan]--debug[/cyan]           Enable debug mode\n");
+    echo Utils::colorize("  [cyan]--chunky[/cyan]          Use Chunky ASCII art mode\n");
+    echo Utils::colorize("  [cyan]--setup[/cyan]           Configure AI provider and model\n");
+    echo Utils::colorize("  [cyan]--config[/cyan]          Display current configuration\n");
+    echo Utils::colorize("  [cyan]--refresh-models[/cyan]  Clear OpenRouter model cache\n");
+    echo Utils::colorize("  [cyan]--help[/cyan]            Show this help message\n\n");
     exit(0);
 }
 
@@ -109,6 +111,18 @@ foreach ($data_dir_paths as $file_path) {
 
 // Initialize Provider Manager
 $providerManager = new ProviderManager($config, $debug);
+
+// Handle model cache refresh
+if ($refreshModels) {
+    $cache_file = __DIR__ . '/app/openrouter_models_cache.json';
+    if (file_exists($cache_file)) {
+        unlink($cache_file);
+        echo Utils::colorize("[green]Model cache cleared. Fresh models will be fetched on next setup.[/green]\n\n");
+    } else {
+        echo Utils::colorize("[yellow]No model cache found.[/yellow]\n\n");
+    }
+    exit(0);
+}
 
 // Handle configuration display
 if ($showConfig) {

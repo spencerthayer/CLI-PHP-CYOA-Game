@@ -71,7 +71,7 @@ return [
                 // xAI
                 'x-ai/grok-beta' => 'Grok Beta (xAI)',
             ],
-            'default_model' => 'openai/gpt-4o-mini',
+            'default_model' => 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
             'supports_functions' => true,
             'headers' => [
                 'Content-Type' => 'application/json',
