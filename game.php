@@ -444,6 +444,9 @@ while (true) {
                     }
                 } else if (is_array($scene_data->options)) {
                     $current_options = $scene_data->options;
+                } else if (is_object($scene_data->options)) {
+                    // Convert object to array for indexed access
+                    $current_options = array_values((array)$scene_data->options);
                 }
 
                 if (preg_match('/^[1-4]$/', $user_input) && $scene_data && isset($current_options[$user_input - 1])) {
