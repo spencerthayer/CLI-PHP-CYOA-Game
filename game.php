@@ -34,33 +34,33 @@ spl_autoload_register(function ($class) {
 use App\GameState;
 use App\ImageHandler;
 use App\ApiHandler;
+use App\ProviderManager;
 use App\Utils;
 use App\AudioHandler;
 
-// Check if debug mode is enabled
+// Check command line arguments
 $debug = in_array('--debug', $argv);
-
-// Check if Chunky ASCII mode is enabled
 $useChunky = in_array('--chunky', $argv);
+$setupProvider = in_array('--setup', $argv);
+$showConfig = in_array('--config', $argv);
 
-// Function to get the API key
-function get_api_key($api_key_file) {
-    $data_dir = dirname($api_key_file);
-    if (!is_dir($data_dir)) {
-        mkdir($data_dir, 0755, true);
-    }
+// Function to display help message
+function displayHelp() {
+    echo Utils::colorize("\n[bold][cyan]The Dying Earth - Command Line Options[/cyan][/bold]\n\n");
+    echo Utils::colorize("[green]Usage:[/green] php game.php [options]\n\n");
+    echo Utils::colorize("[yellow]Options:[/yellow]\n");
+    echo Utils::colorize("  [cyan]--new[/cyan]      Start a new game\n");
+    echo Utils::colorize("  [cyan]--debug[/cyan]    Enable debug mode\n");
+    echo Utils::colorize("  [cyan]--chunky[/cyan]   Use Chunky ASCII art mode\n");
+    echo Utils::colorize("  [cyan]--setup[/cyan]    Configure AI provider and model\n");
+    echo Utils::colorize("  [cyan]--config[/cyan]   Display current configuration\n");
+    echo Utils::colorize("  [cyan]--help[/cyan]     Show this help message\n\n");
+    exit(0);
+}
 
-    if (file_exists($api_key_file)) {
-        $api_key = trim(file_get_contents($api_key_file));
-        if (!empty($api_key)) {
-            return $api_key;
-        }
-    }
-    echo "Please enter your OpenAI API key: ";
-    $api_key = trim(fgets(STDIN));
-    file_put_contents($api_key_file, $api_key, LOCK_EX);
-    chmod($api_key_file, 0600);
-    return $api_key;
+// Check for help flag
+if (in_array('--help', $argv) || in_array('-h', $argv)) {
+    displayHelp();
 }
 
 // Function to write to debug log
@@ -107,6 +107,38 @@ foreach ($data_dir_paths as $file_path) {
     }
 }
 
+// Initialize Provider Manager
+$providerManager = new ProviderManager($config, $debug);
+
+// Handle configuration display
+if ($showConfig) {
+    $providerManager->displayConfiguration();
+    exit(0);
+}
+
+// Handle provider setup
+if ($setupProvider || !$providerManager->isConfigured()) {
+    if (!$providerManager->isConfigured()) {
+        echo Utils::colorize("\n[yellow]No AI provider configured. Starting setup...[/yellow]\n");
+    }
+    $providerManager->setupProvider();
+    
+    // After setup, ask if user wants to start the game
+    echo "\n";
+    $start_game = readline(Utils::colorize("[cyan]Would you like to start the game now? (y/n): [/cyan]"));
+    if (strtolower(trim($start_game)) !== 'y') {
+        echo Utils::colorize("\n[green]Setup complete! Run 'php game.php' to start playing.[/green]\n\n");
+        exit(0);
+    }
+    echo "\n";
+}
+
+// Verify provider is configured before continuing
+if (!$providerManager->isConfigured()) {
+    echo Utils::colorize("[red]Error: No AI provider configured. Run 'php game.php --setup' to configure.[/red]\n");
+    exit(1);
+}
+
 // Initialize components
 $gameState = new GameState($config, $debug);
 write_debug_log("GameState initialized", ['config' => $config, 'debug' => $debug]);
@@ -117,11 +149,13 @@ write_debug_log("ImageHandler initialized", ['useChunky' => $useChunky ? 'true' 
 $audioHandler = new AudioHandler($config, $debug);
 write_debug_log("AudioHandler initialized");
 
-// Display the welcome message with chunky flag info if in debug mode
+// Display the welcome message with configuration info if in debug mode
 if ($debug) {
     echo "[DEBUG] Game initialized with options:";
     echo " debug=" . ($debug ? "true" : "false");
-    echo " chunky=" . ($useChunky ? "true" : "false") . "\n";
+    echo " chunky=" . ($useChunky ? "true" : "false");
+    echo " provider=" . $providerManager->getProvider();
+    echo " model=" . $providerManager->getModel() . "\n";
     
     if ($useChunky) {
         echo "[DEBUG] Using Chunky ASCII art mode for enhanced visual output\n";
@@ -134,8 +168,11 @@ if ($debug) {
     $audioHandler->testAudioGeneration();
 }
 
-$apiHandler = new ApiHandler($config, get_api_key($config['paths']['api_key_file']), $gameState, $debug);
-write_debug_log("ApiHandler initialized with CharacterStats integration");
+$apiHandler = new ApiHandler($config, $providerManager, $gameState, $debug);
+write_debug_log("ApiHandler initialized with ProviderManager and CharacterStats integration", [
+    'provider' => $providerManager->getProvider(),
+    'model' => $providerManager->getModel()
+]);
 
 // Initialize game variables
 $generate_image_toggle = $config['game']['generate_image_toggle'] ?? true;
@@ -175,6 +212,10 @@ if (in_array('--new', $argv)) {
     // Display the game's startup message
     echo Utils::colorize("\n[bold][cyan]Welcome to 'The Dying Earth'![/cyan][/bold]\n");
     echo Utils::colorize("(Type 'exit' or 'quit' to end the game at any time.)\n");
+    
+    // Display current AI configuration
+    $provider_config = $providerManager->getProviderConfig();
+    echo Utils::colorize("\n[dim]Using " . $provider_config['name'] . " - " . $provider_config['models'][$providerManager->getModel()] . "[/dim]\n");
     
     if (!$useChunky) {
         echo Utils::colorize("\n[yellow]TIP: You can use --chunky flag for enhanced ASCII art! Restart with: php game.php --chunky[/yellow]\n\n");
@@ -364,6 +405,10 @@ while (true) {
                     // Display the game's startup message
                     echo Utils::colorize("\n[bold][cyan]Welcome to 'The Dying Earth'![/cyan][/bold]\n");
                     echo Utils::colorize("(Type 'exit' or 'quit' to end the game at any time.)\n");
+                    
+                    // Display current AI configuration
+                    $provider_config = $providerManager->getProviderConfig();
+                    echo Utils::colorize("\n[dim]Using " . $provider_config['name'] . " - " . $provider_config['models'][$providerManager->getModel()] . "[/dim]\n");
                     
                     if (!$useChunky) {
                         echo Utils::colorize("\n[yellow]TIP: You can use --chunky flag for enhanced ASCII art! Restart with: php game.php --chunky[/yellow]\n\n");

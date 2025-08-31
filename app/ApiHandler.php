@@ -4,13 +4,13 @@ namespace App;
 
 class ApiHandler {
     private $config;
-    private $api_key;
+    private $provider_manager;
     private $game_state;
     private $debug;
 
-    public function __construct($config, $api_key, $game_state, $debug = false) {
+    public function __construct($config, $provider_manager, $game_state, $debug = false) {
         $this->config = $config;
-        $this->api_key = $api_key;
+        $this->provider_manager = $provider_manager;
         $this->game_state = $game_state;
         $this->debug = $debug;
     }
@@ -489,8 +489,9 @@ class ApiHandler {
         ];
         $formattedStats = $this->formatStatString($stats, $attributes);
 
+        // Build the API request data
         $data = [
-            'model' => $this->config['api']['model'],
+            'model' => $this->provider_manager->getModel(),
             'messages' => array_merge(
                 [
                     [
@@ -550,27 +551,42 @@ class ApiHandler {
             ],
             'function_call' => ['name' => 'GameResponse']
         ];
+        
+        // Add any provider-specific extra parameters
+        $extra_params = $this->provider_manager->getExtraBodyParams();
+        if (!empty($extra_params)) {
+            $data = array_merge($data, $extra_params);
+        }
 
         if ($this->debug) {
             write_debug_log("Making API call", [
+                'provider' => $this->provider_manager->getProvider(),
                 'model' => $data['model'],
                 'conversation_length' => count($conversation),
                 'has_skill_check' => $has_skill_check
             ]);
         }
 
-        $ch = curl_init($this->config['api']['chat_url']);
+        $ch = curl_init($this->provider_manager->getChatUrl());
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Content-Type: application/json',
-            'Authorization: Bearer ' . $this->api_key
-        ]);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $this->provider_manager->getHeaders());
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->config['api']['timeout'] ?? 30);
 
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curl_error = curl_error($ch);
         curl_close($ch);
+
+        if ($response === false) {
+            if ($this->debug) {
+                write_debug_log("API call failed - cURL error", [
+                    'error' => $curl_error
+                ]);
+            }
+            throw new \Exception("API call failed: " . $curl_error);
+        }
 
         if ($http_code !== 200) {
             if ($this->debug) {
@@ -579,7 +595,21 @@ class ApiHandler {
                     'response' => $response
                 ]);
             }
-            throw new \Exception("API call failed with HTTP code $http_code: $response");
+            
+            // Try to parse error message
+            $error_data = json_decode($response, true);
+            $error_message = $error_data['error']['message'] ?? $response;
+            
+            // Provide helpful error messages for common issues
+            if ($http_code === 401) {
+                throw new \Exception("Authentication failed. Please check your API key.");
+            } else if ($http_code === 429) {
+                throw new \Exception("Rate limit exceeded. Please wait a moment and try again.");
+            } else if ($http_code === 404) {
+                throw new \Exception("Model not found: " . $this->provider_manager->getModel() . ". Please check your model selection.");
+            }
+            
+            throw new \Exception("API call failed with HTTP code $http_code: $error_message");
         }
 
         $response_data = json_decode($response, true);

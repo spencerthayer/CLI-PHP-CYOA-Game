@@ -2,7 +2,8 @@
 
 return [
     'paths' => [
-        'api_key_file' => __DIR__ . '/../.data/.openai_api_key',
+        'api_key_file' => __DIR__ . '/../.data/.api_key', // Generic API key file
+        'provider_config_file' => __DIR__ . '/../.data/.provider_config', // Store selected provider
         'game_history_file' => __DIR__ . '/../.data/.game_history',
         'user_prefs_file' => __DIR__ . '/../.data/.user_prefs',
         'debug_log_file' => __DIR__ . '/../.data/.debug_log',
@@ -10,12 +11,92 @@ return [
         'tmp_dir' => __DIR__ . '/../speech',
     ],
     
+    // Provider configurations
+    'providers' => [
+        'openai' => [
+            'name' => 'OpenAI',
+            'base_url' => 'https://api.openai.com/v1',
+            'chat_endpoint' => '/chat/completions',
+            'models' => [
+                'gpt-4o-mini' => 'GPT-4o Mini (Fast, Affordable)',
+                'gpt-4o' => 'GPT-4o (Most Capable)',
+                'gpt-4-turbo' => 'GPT-4 Turbo (Legacy)',
+                'gpt-3.5-turbo' => 'GPT-3.5 Turbo (Legacy, Fast)',
+            ],
+            'default_model' => 'gpt-4o-mini',
+            'supports_functions' => true,
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer {API_KEY}'
+            ]
+        ],
+        'openrouter' => [
+            'name' => 'OpenRouter',
+            'base_url' => 'https://openrouter.ai/api/v1',
+            'chat_endpoint' => '/chat/completions',
+            'models' => [
+                // OpenAI Models via OpenRouter
+                'openai/gpt-4o' => 'GPT-4o (OpenAI)',
+                'openai/gpt-4o-mini' => 'GPT-4o Mini (OpenAI)',
+                'openai/gpt-4-turbo' => 'GPT-4 Turbo (OpenAI)',
+                'openai/gpt-3.5-turbo' => 'GPT-3.5 Turbo (OpenAI)',
+                
+                // Anthropic Models
+                'anthropic/claude-3.5-sonnet' => 'Claude 3.5 Sonnet (Most Capable)',
+                'anthropic/claude-3-opus' => 'Claude 3 Opus (Creative)',
+                'anthropic/claude-3-sonnet' => 'Claude 3 Sonnet (Balanced)',
+                'anthropic/claude-3-haiku' => 'Claude 3 Haiku (Fast)',
+                
+                // Google Models
+                'google/gemini-pro-1.5' => 'Gemini Pro 1.5 (Google)',
+                'google/gemini-flash-1.5' => 'Gemini Flash 1.5 (Fast)',
+                
+                // Meta Models
+                'meta-llama/llama-3.1-405b-instruct' => 'Llama 3.1 405B (Meta)',
+                'meta-llama/llama-3.1-70b-instruct' => 'Llama 3.1 70B (Meta)',
+                
+                // Mistral Models
+                'mistralai/mistral-large' => 'Mistral Large',
+                'mistralai/mixtral-8x7b-instruct' => 'Mixtral 8x7B',
+                
+                // Nous Research
+                'nousresearch/hermes-3-llama-3.1-405b' => 'Hermes 3 405B',
+                
+                // DeepSeek
+                'deepseek/deepseek-chat' => 'DeepSeek Chat',
+                
+                // Qwen
+                'qwen/qwen-2.5-72b-instruct' => 'Qwen 2.5 72B',
+                
+                // xAI
+                'x-ai/grok-beta' => 'Grok Beta (xAI)',
+            ],
+            'default_model' => 'openai/gpt-4o-mini',
+            'supports_functions' => true,
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer {API_KEY}',
+                'HTTP-Referer' => 'https://github.com/the-dying-earth-cli', // Optional: for rankings
+                'X-Title' => 'The Dying Earth CLI Game' // Optional: for app attribution
+            ],
+            'extra_body' => [
+                // Optional parameters for OpenRouter
+                'provider' => [
+                    'order' => [], // Can specify provider preference
+                    'allow_fallbacks' => true
+                ]
+            ]
+        ]
+    ],
+    
+    // Default API settings (provider-agnostic)
     'api' => [
-        'model' => 'gpt-4o-mini',
-        'chat_url' => 'https://api.openai.com/v1/chat/completions',
         'max_tokens' => 1280,
         'temperature' => 1.0,
         'max_image_description_length' => 64,
+        'timeout' => 30, // API timeout in seconds
+        'retry_attempts' => 3,
+        'retry_delay' => 2, // Delay between retries in seconds
     ],
     
     'game' => [
@@ -93,6 +174,5 @@ return [
 ### **Soul Attributes**
 
 - **Spirit**: Spiritual connection, affecting magical abilities, resistance to spiritual or elemental effects, and interactions with mystical entities.
-- **Luck**: Fortune and discovery, influencing random events, critical successes, and item finds.
-",
+- **Luck**: Fortune and discovery, influencing random events, critical successes, and item finds.",
 ]; 
