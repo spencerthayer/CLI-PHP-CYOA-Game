@@ -7,6 +7,7 @@
 - **NEVER** create temporary debugging scripts
 - **NEVER** create one-off utility files for testing
 - Work directly with production files only
+- You can create new files if they are part of production.
 - Use existing files for testing: game.php with appropriate flags
 
 ### 2. File Management Rules
