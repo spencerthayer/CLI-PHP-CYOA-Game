@@ -1,6 +1,21 @@
-# The Quest of the Forgotten Realm
+# The Dying Earth CYOA CLI
 
-Welcome to **The Quest of the Forgotten Realm**, an interactive text-based adventure game created during **Cascadia PHP 2024**. This project leverages OpenAI's ChatGPT and DALL·E 2 APIs to deliver a dynamic and immersive storytelling experience directly in your command-line interface (CLI). A heartfelt thank you to the organizers and participants of Cascadia PHP 2024 for inspiring and supporting this project!
+Welcome to **The Dying Earth**, an interactive text-based adventure game inspired by Jack Vance's legendary Dying Earth series. This project leverages OpenAI's ChatGPT and DALL·E 2 APIs to deliver a dynamic and immersive storytelling experience set in the twilight of civilization on a world immeasurably aged. Experience the opulent prose style of Jack Vance enriched with elements reminiscent of Monte Cook's Numenera, directly in your command-line interface (CLI). Created during **Cascadia PHP 2024**, with heartfelt thanks to the organizers and participants for inspiring and supporting this project!
+
+_**This project is no longer in development as it was a good proof of concept for something larger to come.**_
+
+## About The Setting
+
+**The Dying Earth** transports you to a grimdark world in the final epoch of existence, where:
+
+- The sun wanes in the sky, casting spectral light over landscapes layered with the ruins of countless civilizations
+- Magic and ancient technology blur together, their boundaries long forgotten
+- Wonders from bygone eras lie half-buried, waiting to be discovered—or to ensnare the unwary
+- Every location bears the weight of immeasurable history, with exotic locales and peculiar customs
+- Cosmic horror lurks beneath the veneer of faded grandeur
+- Knowledge and power await those willing to delve into the depths of time, though not without peril
+
+The game captures the ornate, elaborate prose style of Jack Vance's original works, where every description drips with baroque detail and every encounter may lead to deeper enigmas. Players navigate this twilight realm where the boundaries between wonder and danger, knowledge and madness, are perilously thin.
 
 ## Table of Contents
 
@@ -78,15 +93,15 @@ Before you begin, ensure you have met the following requirements:
    Clone the GitHub repository to your local machine using the following command:
 
    ```bash
-   git clone https://github.com/yourusername/quest-of-the-forgotten-realm.git
+   git clone https://github.com/yourusername/the-dying-earth.git
    ```
 
-   Replace `yourusername/quest-of-the-forgotten-realm` with the actual GitHub username and repository name.
+   Replace `yourusername/the-dying-earth` with the actual GitHub username and repository name.
 
 2. **Navigate to the Project Directory**
 
    ```bash
-   cd quest-of-the-forgotten-realm
+   cd the-dying-earth
    ```
 
 3. **Ensure Dependencies Are Met**
@@ -180,13 +195,13 @@ php game.php
   After launching the game, you'll receive a welcome message:
 
   ```
-  Welcome to 'The Quest of the Forgotten Realm'!
+  Welcome to 'The Dying Earth'!
   (Type 'exit' or 'quit' to end the game at any time.)
   ```
 
 - **Receiving Narration**
 
-  The game will provide vivid descriptions of your surroundings, enriched with emojis to enhance visualization.
+  The game will provide opulent and elaborate descriptions in the style of Jack Vance, painting the twilight world where ancient magics and forgotten technologies blur together, enriched with emojis to enhance visualization.
 
 - **Making Choices**
 
@@ -336,7 +351,8 @@ Success or failure in these rolls determines the outcome of your actions and how
   - Open `app/config.php` in a text editor.
   - Modify the `system_prompt` key within the returned array to change the game's setting or rules.
     ```php
-    'system_prompt' => "You are an interactive sci-fi adventure game set in space...",
+    'system_prompt' => "You are an interactive text-based adventure game called 'The Dying Earth.'
+    This is a grimdark world set in the twilight of civilization...",
     ```
 
 - **Adjusting API Parameters**
@@ -492,9 +508,9 @@ Save output to a file:
 chunky image.png -o output.txt
 ```
 
-## Integration with "The Quest of the Forgotten Realm" Game
+## Integration with "The Dying Earth" Game
 
-The Chunky ASCII Art Converter can be used to enhance the visuals in "The Quest of the Forgotten Realm" game. To enable Chunky mode:
+The Chunky ASCII Art Converter can be used to enhance the visuals in "The Dying Earth" game. To enable Chunky mode:
 
 ```bash
 php game.php --chunky
