@@ -306,22 +306,23 @@ if ($should_make_api_call) {
     write_debug_log("Making initial API call");
     $response = $apiHandler->makeApiCall($gameState->getConversation());
     
-    if ($response) {
-        if ($debug) {
-            write_debug_log("API response received", $response);
-        }
-        
-        $gameState->addMessage('assistant', '', ['name' => 'GameResponse', 'arguments' => json_encode($response)]);
-        
-        // Convert array to object for compatibility
-        $scene_data = json_decode(json_encode($response));
-        if (!$scene_data) {
-            throw new \Exception("Failed to parse scene data");
-        }
-        // Add timestamp if not present
-        if (!isset($scene_data->timestamp)) {
-            $scene_data->timestamp = time();
-        }
+            if ($response) {
+            if ($debug) {
+                write_debug_log("API response received", $response);
+            }
+            
+            // Store as function_call for backward compatibility
+            $gameState->addMessage('assistant', '', ['name' => 'GameResponse', 'arguments' => json_encode($response)]);
+            
+            // Convert array to object for compatibility
+            $scene_data = json_decode(json_encode($response));
+            if (!$scene_data) {
+                throw new \Exception("Failed to parse scene data");
+            }
+            // Add timestamp if not present
+            if (!isset($scene_data->timestamp)) {
+                $scene_data->timestamp = time();
+            }
     } else {
         throw new \Exception("No valid response from API");
     }
@@ -338,16 +339,30 @@ while (true) {
         static $last_processed_timestamp = 0;
         
         // Extract scene data from the last message if needed
+        // Handle both function_call (old format) and tool_calls (new format)
+        $args = null;
         if (isset($lastMsg['function_call'])) {
-            $args = null;
+            // Old format
             if (is_object($lastMsg['function_call']) && isset($lastMsg['function_call']->arguments)) {
                 $args = $lastMsg['function_call']->arguments;
             } elseif (is_array($lastMsg['function_call']) && isset($lastMsg['function_call']['arguments'])) {
                 $args = $lastMsg['function_call']['arguments'];
             }
-            
-            if ($args) {
-                $new_scene_data = json_decode($args);
+        } elseif (isset($lastMsg['tool_calls'])) {
+            // New format for OpenRouter
+            if (is_array($lastMsg['tool_calls']) && isset($lastMsg['tool_calls'][0]['function']['arguments'])) {
+                $args = $lastMsg['tool_calls'][0]['function']['arguments'];
+            }
+        }
+        
+        if ($args) {
+                // Args might already be decoded or need decoding
+                if (is_string($args)) {
+                    $new_scene_data = json_decode($args);
+                } else {
+                    $new_scene_data = $args;
+                }
+                
                 if ($new_scene_data && isset($new_scene_data->narrative)) {
                     // Use timestamp from message or scene data
                     $msg_timestamp = $lastMsg['timestamp'] ?? 0;
@@ -366,7 +381,6 @@ while (true) {
                     }
                 }
             }
-        }
         
         displayGameMenu($generate_image_toggle, $generate_audio_toggle);
         
@@ -620,6 +634,7 @@ while (true) {
                     write_debug_log("API response received", $response);
                 }
                 
+                // Store as function_call for backward compatibility
                 $gameState->addMessage('assistant', '', ['name' => 'GameResponse', 'arguments' => json_encode($response)]);
                 
                 // Convert array to object for compatibility

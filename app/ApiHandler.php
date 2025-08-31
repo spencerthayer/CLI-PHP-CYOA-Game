@@ -394,11 +394,22 @@ class ApiHandler {
     }
 
     private function processApiResponse($response_data) {
-        if (!isset($response_data['choices'][0]['message']['function_call'])) {
-            throw new \Exception("Unexpected API response format");
+        // Handle both function_call (OpenAI) and tool_calls (OpenRouter) formats
+        $function_args = null;
+        
+        if (isset($response_data['choices'][0]['message']['function_call'])) {
+            // OpenAI format
+            $function_args = json_decode($response_data['choices'][0]['message']['function_call']['arguments'], true);
+        } else if (isset($response_data['choices'][0]['message']['tool_calls'][0]['function']['arguments'])) {
+            // OpenRouter/tools format
+            $function_args = json_decode($response_data['choices'][0]['message']['tool_calls'][0]['function']['arguments'], true);
+        } else {
+            throw new \Exception("Unexpected API response format - no function_call or tool_calls found");
         }
-
-        $function_args = json_decode($response_data['choices'][0]['message']['function_call']['arguments'], true);
+        
+        if (!$function_args) {
+            throw new \Exception("Failed to parse function arguments from API response");
+        }
         
         if ($this->debug) {
             write_debug_log("Parsed function arguments", $function_args);
@@ -490,6 +501,44 @@ class ApiHandler {
         $formattedStats = $this->formatStatString($stats, $attributes);
 
         // Build the API request data
+        $provider = $this->provider_manager->getProvider();
+        
+        // Define the function/tool schema
+        $function_schema = [
+            'name' => 'GameResponse',
+            'description' => 'Response from the game, containing narrative description and available options. The narrative should be immersive but should NOT include the options list in the narrative - options will be displayed separately.',
+            'parameters' => [
+                'type' => 'object',
+                'properties' => [
+                    'narrative' => [
+                        'type' => 'string',
+                        'description' => 'A rich, atmospheric description of the current scene and its events. Do not include the options list in this field.'
+                    ],
+                    'options' => [
+                        'type' => 'array',
+                        'items' => [
+                            'type' => 'string'
+                        ],
+                        'minItems' => 4,
+                        'maxItems' => 4,
+                        'description' => 'Exactly 4 options for the player to choose from. Each option should be a string that may include an emoji and optional skill check in format [Attribute DC:XX]'
+                    ],
+                    'image' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'prompt' => [
+                                'type' => 'string',
+                                'description' => 'A descriptive prompt for generating an 8-bit style image of the current scene',
+                                'maxLength' => 64
+                            ]
+                        ],
+                        'required' => ['prompt']
+                    ]
+                ],
+                'required' => ['narrative', 'options', 'image']
+            ]
+        ];
+        
         $data = [
             'model' => $this->provider_manager->getModel(),
             'messages' => array_merge(
@@ -512,45 +561,27 @@ class ApiHandler {
                     ]
                 ],
                 $conversation
-            ),
-            'functions' => [
-                [
-                    'name' => 'GameResponse',
-                    'description' => 'Response from the game, containing narrative description and available options. The narrative should be immersive but should NOT include the options list in the narrative - options will be displayed separately.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'narrative' => [
-                                'type' => 'string',
-                                'description' => 'A rich, atmospheric description of the current scene and its events. Do not include the options list in this field.'
-                            ],
-                            'options' => [
-                                'type' => 'array',
-                                'items' => [
-                                    'type' => 'string'
-                                ],
-                                'minItems' => 4,
-                                'maxItems' => 4,
-                                'description' => 'Exactly 4 options for the player to choose from. Each option should be a string that may include an emoji and optional skill check in format [Attribute DC:XX]'
-                            ],
-                            'image' => [
-                                'type' => 'object',
-                                'properties' => [
-                                    'prompt' => [
-                                        'type' => 'string',
-                                        'description' => 'A descriptive prompt for generating an 8-bit style image of the current scene',
-                                        'maxLength' => 64
-                                    ]
-                                ],
-                                'required' => ['prompt']
-                            ]
-                        ],
-                        'required' => ['narrative', 'options', 'image']
-                    ]
-                ]
-            ],
-            'function_call' => ['name' => 'GameResponse']
+            )
         ];
+        
+        // Use tools format for OpenRouter, functions format for OpenAI
+        if ($provider === 'openrouter') {
+            // OpenRouter uses tools format
+            $data['tools'] = [
+                [
+                    'type' => 'function',
+                    'function' => $function_schema
+                ]
+            ];
+            $data['tool_choice'] = [
+                'type' => 'function',
+                'function' => ['name' => 'GameResponse']
+            ];
+        } else {
+            // OpenAI uses functions format
+            $data['functions'] = [$function_schema];
+            $data['function_call'] = ['name' => 'GameResponse'];
+        }
         
         // Add any provider-specific extra parameters
         $extra_params = $this->provider_manager->getExtraBodyParams();

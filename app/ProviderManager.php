@@ -563,7 +563,25 @@ class ProviderManager {
         echo Utils::colorize("[bold][cyan]═══════════════════════════════════════════════════════[/cyan][/bold]\n\n");
         
         echo Utils::colorize("[bold]Provider:[/bold] [green]" . $provider_config['name'] . "[/green]\n");
-        echo Utils::colorize("[bold]Model:[/bold] [green]" . $provider_config['models'][$this->model] . "[/green]\n");
+        
+        // Get model display name
+        $model_display = $this->model;
+        if ($this->provider === 'openrouter') {
+            // For OpenRouter, fetch models to get the proper display name
+            $models = $this->fetchOpenRouterModels();
+            if (isset($models[$this->model])) {
+                $model_display = $models[$this->model];
+            } else {
+                // Fallback display for Venice model
+                if ($this->model === 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free') {
+                    $model_display = "Venice: Uncensored (free) (🆓 FREE)";
+                }
+            }
+        } else if (isset($provider_config['models'][$this->model])) {
+            $model_display = $provider_config['models'][$this->model];
+        }
+        
+        echo Utils::colorize("[bold]Model:[/bold] [green]" . $model_display . "[/green]\n");
         echo Utils::colorize("[bold]Model ID:[/bold] [dim]" . $this->model . "[/dim]\n");
         echo Utils::colorize("[bold]API Key:[/bold] [dim]" . substr($this->api_key, 0, 8) . "..." . substr($this->api_key, -4) . "[/dim]\n");
         
