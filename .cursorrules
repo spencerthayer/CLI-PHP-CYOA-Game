@@ -1,0 +1,62 @@
+# Cursor Rules for CLI-PHP-CYOA-Game
+
+## Core Development Principles
+
+### 1. NO TEST FILE CREATION
+- **NEVER** create new test files (e.g., test_*.php, test-*.php, *_test.php)
+- **NEVER** create temporary debugging scripts
+- **NEVER** create one-off utility files for testing
+- Work directly with production files only
+- Use existing files for testing: game.php with appropriate flags
+
+### 2. File Management Rules
+- **MODIFY** existing files rather than creating new ones
+- **DELETE** any temporary test files if they exist
+- **USE** command-line flags for testing (--debug, --setup, --config, etc.)
+- **LEVERAGE** existing utilities: fetch_models.php, migrate.php are acceptable as they serve production purposes
+
+### 3. Testing Approach
+- Test functionality by running the actual game: `php game.php`
+- Use debug mode for troubleshooting: `php game.php --debug`
+- Verify configurations with: `php game.php --config`
+- Test provider setup with: `php game.php --setup`
+
+### 4. Code Quality Standards
+- All code changes must be made to production files
+- Maintain backward compatibility when updating
+- Ensure error handling is robust in production code
+- Add debug logging to production code rather than creating test scripts
+
+### 5. Forbidden Actions
+❌ Creating files like:
+- test_providers.php
+- test_game_start.php
+- test_venice.php
+- debug_*.php
+- check_*.php
+- verify_*.php
+- Any temporary testing scripts
+
+### 6. Allowed Actions
+✅ Working with:
+- game.php (main game file)
+- app/*.php (application components)
+- fetch_models.php (production utility)
+- migrate.php (migration utility)
+- config files and documentation
+
+### 7. Problem-Solving Approach
+When encountering issues:
+1. First, check existing debug output in production code
+2. Add debug logging to production files if needed
+3. Use command-line flags to test specific features
+4. Fix issues directly in production code
+5. Remove any accidentally created test files
+
+### 8. Documentation Updates
+- Update README.md with any new features or changes
+- Keep documentation in sync with code changes
+- Document command-line options and configurations
+
+## Remember
+**Production-first development**: Every change should improve the actual game, not create testing infrastructure. The game itself IS the test environment when run with appropriate flags.
