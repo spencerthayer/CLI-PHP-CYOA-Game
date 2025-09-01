@@ -20,11 +20,11 @@ class ImageHandler {
      * @param int $timestamp Timestamp used as seed
      * @param int $width Image width (default: 360)
      * @param int $height Image height (default: 160)
-     * @param string $model Model to use (default: flux)
+     * @param string $model Model to use (default: turbo)
      * @param string $negative_prompt Negative prompt (default: text)
      * @return string The fully constructed URL
      */
-    private function buildPollinationsUrl($prompt, $timestamp, $width = 360, $height = 160, $model = 'flux', $negative_prompt = 'text') {
+    private function buildPollinationsUrl($prompt, $timestamp, $width = 360, $height = 160, $model = 'turbo', $negative_prompt = 'text') {
         // Sanitize prompt: remove newlines before URL encoding
         $prompt = str_replace(["\n", "\r"], ' ', $prompt);
         $prompt_url = urlencode($prompt);
@@ -96,7 +96,7 @@ class ImageHandler {
      * @return string
      */
     private function getTitlePrompt(): string {
-        return "Grimdark 8bit pixel art game title screen for \"The Dying Earth\", dark fantasy RPG game";
+        return "8bit pixel art game title screen for \"The Dying Earth\", dark fantasy RPG game";
     }
     
     public function generateImage($prompt, $timestamp) {
@@ -146,7 +146,7 @@ class ImageHandler {
             return null;
         }
         
-        $final_prompt = "Grimdark 8bit pixel art $prompt";
+        $final_prompt = "8bit pixel art $prompt";
         $url = $this->buildPollinationsUrl($final_prompt, $timestamp);
         $image_path = $this->getImagePathForTimestamp($timestamp);
         
