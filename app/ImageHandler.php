@@ -405,28 +405,23 @@ class ImageHandler {
         $image_path = $this->getImagePathForTimestamp($timestamp);
         $success = false;
         
-        // Try OpenRouter first if enabled
+        // Use OpenRouter/Google Gemini exclusively
         if ($this->use_openrouter && $this->api_key) {
             if ($this->debug) {
-                echo "[DEBUG] Trying OpenRouter image generation...\n";
+                echo "[DEBUG] Using Google Gemini for image generation...\n";
             }
             $success = $this->generateWithOpenRouter($prompt, $timestamp, $image_path);
             
-            if (!$success && $this->debug) {
-                echo "[DEBUG] OpenRouter failed, falling back to Pollinations...\n";
+            if (!$success) {
+                if ($this->debug) {
+                    echo "[DEBUG] Google Gemini image generation failed\n";
+                }
+                write_debug_log("Google Gemini image generation failed");
+                return null; // No fallback - Google only
             }
-        }
-        
-        // Fall back to Pollinations if OpenRouter fails or is disabled
-        if (!$success) {
-            $final_prompt = "8bit pixel art $prompt";
-            $width = $this->config['image']['pollinations']['width'] ?? 640;
-            $height = $this->config['image']['pollinations']['height'] ?? 360;
-            $url = $this->buildPollinationsUrl($final_prompt, $timestamp, $width, $height);
-            
-            if (!$this->fetchAndSaveImage($url, $image_path, 'image')) {
-                return null;
-            }
+        } else {
+            write_debug_log("Google Gemini not available - no API key or disabled");
+            return null; // No image generation without Google
         }
         
         $ascii_art = $this->generateAsciiArt($image_path);

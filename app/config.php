@@ -107,24 +107,16 @@ return [
         'max_height' => 30, // Maximum height for ASCII art
         
         // Image generation service configuration
-        'generation_service' => 'pollinations', // Options: 'openrouter', 'pollinations', 'both'
-        'prefer_openrouter' => false, // Gemini only generates square images (1:1), not suitable for our needs
+        'generation_service' => 'openrouter', // Using Google Gemini only
+        'prefer_openrouter' => true, // Use Google Gemini exclusively
         
-        // OpenRouter settings - Gemini 2.5 Flash Image Preview (LIMITATION: Only generates 1:1 square images)
+        // OpenRouter settings - Google Gemini 2.5 Flash Image Preview
         'openrouter' => [
             'model' => 'google/gemini-2.5-flash-image-preview:free',
-            'enabled' => false, // Disabled due to square-only limitation
+            'enabled' => true,
             'timeout' => 30,
-            // Would cost $0.039 per image but doesn't support custom aspect ratios
-        ],
-        
-        // Pollinations settings (free and supports 16:9!) - Primary service
-        'pollinations' => [
-            'model' => 'turbo', // 'turbo' (fast, reliable) or 'flux' (better but often down)
-            'width' => 640,  // 16:9 aspect ratio - WORKS!
-            'height' => 360, // 16:9 aspect ratio - WORKS!
-            'timeout' => 20,
-            'fallback_on_failure' => true, // Fall back to no image if generation fails
+            // Note: Generates 1024x1024 square images only (1:1 aspect ratio)
+            // Cost: $0.039 per image (1290 output tokens at $30/1M tokens)
         ],
     ],
     
