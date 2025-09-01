@@ -169,7 +169,15 @@ return [
         When a skill check has been made:
         - For SUCCESS: Describe the character accomplishing their goal, possibly with additional benefits
         - For FAILURE: Describe setbacks or complications, but avoid outright killing the character
-
+        
+        CRITICAL RULE - Story Progression:
+        - After a failed skill check, DO NOT present the same challenge again
+        - When the player fails, show consequences and provide alternative paths forward
+        - Each failure should lead to new opportunities or different approaches
+        - Track what has been attempted and build upon previous outcomes
+        - If examining something fails, perhaps offer to approach it differently or explore elsewhere
+        
+        Difficulty Guidelines:
         Very easy checks (DC 4-7)
         Moderate challenges (DC 8-12)
         Difficult challenges (DC 13-16)

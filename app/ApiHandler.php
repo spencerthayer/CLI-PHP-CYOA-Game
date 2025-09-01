@@ -453,6 +453,7 @@ class ApiHandler {
         // Get the last user message to check for action-based skill checks
         $last_message = end($conversation);
         $has_skill_check = preg_match('/\[(\w+)\s+DC:(\d+)\]/', $last_message['content'], $matches);
+        $skill_check_narrative = "";
         
         if ($has_skill_check) {
             // Pre-roll the skill check based on the action's DC
@@ -466,21 +467,37 @@ class ApiHandler {
                 // Display the roll result
                 echo "\n🎲 " . $attribute . " Check: " . $check_result['roll'] . " + " . $check_result['modifier'] . " (modifier) = " . 
                      $check_result['roll'] + $check_result['modifier'] . " vs DC " . $difficulty . " - " . ($check_result['success'] ? "Success!" : "Failure!") . "\n\n";
+                
+                // Create a narrative description of the skill check result
+                $skill_check_narrative = "\n[SKILL CHECK RESULT: " . $attribute . " roll of " . 
+                    ($check_result['roll'] + $check_result['modifier']) . " vs DC " . $difficulty . " - " . 
+                    ($check_result['success'] ? "SUCCESS" : "FAILURE") . ". " .
+                    "The player " . ($check_result['success'] ? "succeeded in their attempt" : "failed in their attempt") . ".]\n";
             } else {
                 $check_result = $stats->savingThrow($attribute, $difficulty);
                 // Display the roll result
                 echo "\n🎲 " . $attribute . " Save: " . $check_result['roll'] . " + " . $check_result['modifier'] . " (modifier) = " . 
                      $check_result['roll'] + $check_result['modifier'] . " vs DC " . $difficulty . " - " . ($check_result['success'] ? "Success!" : "Failure!") . "\n\n";
+                
+                // Create a narrative description of the saving throw result
+                $skill_check_narrative = "\n[SAVING THROW RESULT: " . $attribute . " roll of " . 
+                    ($check_result['roll'] + $check_result['modifier']) . " vs DC " . $difficulty . " - " . 
+                    ($check_result['success'] ? "SUCCESS" : "FAILURE") . ". " .
+                    "The player " . ($check_result['success'] ? "resisted the effect" : "failed to resist") . ".]\n";
             }
             
             $this->game_state->setLastCheckResult($check_result);
+            
+            // Add the skill check result to the conversation history
+            $this->game_state->addMessage('system', $skill_check_narrative);
             
             if ($this->debug) {
                 write_debug_log("Action Check Result", [
                     'type' => 'action_check',
                     'attribute' => $attribute,
                     'difficulty' => $difficulty,
-                    'result' => $check_result
+                    'result' => $check_result,
+                    'narrative_added' => $skill_check_narrative
                 ]);
             }
         }
@@ -536,6 +553,9 @@ class ApiHandler {
             ]
         ];
         
+        // Get the updated conversation after adding skill check result
+        $updated_conversation = $has_skill_check ? $this->game_state->getConversation() : $conversation;
+        
         $data = [
             'model' => $this->provider_manager->getModel(),
             'messages' => array_merge(
@@ -543,8 +563,7 @@ class ApiHandler {
                     [
                         'role' => 'system',
                         'content' => "You are narrating a dark fantasy RPG game. Provide immersive narrative descriptions but DO NOT include the options list in the narrative - options will be displayed separately. Each action choice MUST include a skill check in the format [Attribute DC:difficulty], where difficulty is between " . $this->config['difficulty_range']['min'] . " and " . $this->config['difficulty_range']['max'] . ", representing a range from trivial to nearly impossible challenges. Use emojis to enhance the presentation of choices." . 
-                            ($has_skill_check ? "\nLAST SKILL CHECK RESULT: " . $attribute . " Check " . ($check_result['success'] ? "SUCCEEDED" : "FAILED") . 
-                            " (Rolled: " . $check_result['roll'] . " + " . $check_result['modifier'] . " = " . $check_result['roll'] + $check_result['modifier'] . " vs DC " . $difficulty . ")" : "") .
+                            "\n\nIMPORTANT: Build upon the previous narrative and skill check results. When a skill check fails, provide alternative paths or consequences, not the same challenge again. Progress the story based on successes and failures." .
                             "\n\nThe player's current stats are:\n" .
                             "Primary Attributes:\n" .
                             $formattedStats .
@@ -557,7 +576,7 @@ class ApiHandler {
                             "Experience: " . $stats->getExperience() . "\n"
                     ]
                 ],
-                $conversation
+                $updated_conversation
             )
         ];
         
