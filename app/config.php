@@ -104,7 +104,7 @@ return [
     'image' => [
         'scale' => 4, // Scale factor for ASCII art conversion
         'max_width' => 100, // Maximum width for ASCII art
-        'max_height' => 30, // Maximum height for ASCII art
+        'max_height' => 20, // Maximum height for ASCII art
         
         // Image generation service configuration
         'generation_service' => 'openrouter', // Using Google Gemini only

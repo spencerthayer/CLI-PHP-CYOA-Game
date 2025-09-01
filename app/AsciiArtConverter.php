@@ -39,27 +39,95 @@ class AsciiArtConverter {
         // Get original image dimensions
         list($orig_width, $orig_height) = getimagesize($file);
         
-        // Get terminal dimensions and calculate scaling
+        // Get terminal dimensions for bounds
         $terminal = $this->getTerminalSize();
-        $max_cols = $terminal['cols'] - 2;
-        $max_rows = $terminal['rows'] - 1;
+        $terminal_width = $terminal['cols'];
+        $terminal_height = $terminal['rows'] - 10; // Leave room for text below
         
-        // Calculate scaling factors
-        $char_aspect = 2.5;
-        $width_scale = $max_cols / $orig_width;
-        $height_scale = ($max_rows * $char_aspect) / $orig_height;
-        $scale_factor = min($width_scale, $height_scale, 1);
+        // Use configured max dimensions, don't limit by terminal size when piped
+        // When running in a pipe (like our test), terminal detection fails and returns small values
+        $max_cols = isset($this->config['image']['max_width']) ? 
+                    $this->config['image']['max_width'] : 
+                    100;
+        $max_rows = isset($this->config['image']['max_height']) ? 
+                    $this->config['image']['max_height'] : 
+                    40;
         
-        // Calculate new dimensions
-        $width = max(1, floor($orig_width * $scale_factor));
-        $height = max(1, floor($orig_height * $scale_factor));
+        // Character aspect ratio (terminal chars are ~2.2x taller than wide)
+        // This means we need ~2.2x more columns than rows to display a square
+        $char_aspect_ratio = 2.2; 
         
-        // Resize image if needed
-        if ($scale_factor < 1) {
-            $img = $this->resizeImage($img, $width, $height, $orig_width, $orig_height);
+        // Calculate the image aspect ratio
+        $image_aspect = $orig_width / $orig_height;
+        
+        // For a 1:1 image to appear square in terminal, we need width = height * char_aspect_ratio
+        // So for a square image: cols = rows * 2.2
+        
+        // Calculate what dimensions we need to preserve aspect ratio
+        if ($image_aspect >= 1.0) {
+            // Image is wider than tall or square
+            // Try to use maximum width
+            $final_cols = $max_cols;
+            $final_rows = round($final_cols / ($char_aspect_ratio * $image_aspect));
+            
+            // Check if height exceeds max
+            if ($final_rows > $max_rows) {
+                $final_rows = $max_rows;
+                $final_cols = round($final_rows * $char_aspect_ratio * $image_aspect);
+            }
+        } else {
+            // Image is taller than wide
+            // Try to use maximum height
+            $final_rows = $max_rows;
+            $final_cols = round($final_rows * $char_aspect_ratio * $image_aspect);
+            
+            // Check if width exceeds max
+            if ($final_cols > $max_cols) {
+                $final_cols = $max_cols;
+                $final_rows = round($final_cols / ($char_aspect_ratio * $image_aspect));
+            }
         }
         
-        return $this->processImage($img, $width, $height);
+        // Ensure minimum dimensions
+        $final_cols = max(1, min($max_cols, $final_cols));
+        $final_rows = max(1, min($max_rows, $final_rows));
+        
+        // Debug output (uncomment if needed)
+        // error_log("[ASCII] Image: {$orig_width}x{$orig_height}, aspect: {$image_aspect}");
+        // error_log("[ASCII] Max cols: {$max_cols}, Max rows: {$max_rows}");
+        // error_log("[ASCII] Final dimensions: {$final_cols}x{$final_rows}");
+        
+        // Resize the image to the calculated dimensions
+        $img = $this->resizeImage($img, $final_cols, $final_rows, $orig_width, $orig_height);
+        
+        $ascii_art = $this->processImage($img, $final_cols, $final_rows);
+        return $this->centerAsciiArt($ascii_art);
+    }
+    
+    protected function centerAsciiArt($ascii_art) {
+        // Get terminal width for centering
+        $terminal = $this->getTerminalSize();
+        $terminal_width = $terminal['cols'];
+        
+        // Center each line of the ASCII art
+        $lines = explode(PHP_EOL, $ascii_art);
+        $centered_art = "";
+        
+        foreach ($lines as $line) {
+            // Remove ANSI codes to get actual character count
+            $clean_line = preg_replace('/\e\[[0-9;]*m/', '', $line);
+            $line_length = mb_strlen($clean_line);
+            
+            if ($line_length > 0) {
+                // Calculate padding for centering
+                $padding = max(0, floor(($terminal_width - $line_length) / 2));
+                $centered_art .= str_repeat(' ', $padding) . $line . PHP_EOL;
+            } else {
+                $centered_art .= PHP_EOL;
+            }
+        }
+        
+        return rtrim($centered_art);
     }
     
     protected function getTerminalSize() {
@@ -98,13 +166,10 @@ class AsciiArtConverter {
     
     protected function processImage($img, $width, $height) {
         $ascii_art = "";
-        $scale = 1.25;
-        $char_aspect = 2.5;
-        $half_region = floor($this->config['region_size'] / 3);
         
-        // Calculate step sizes
-        $step_x = max(1, (int)floor($scale * $half_region));
-        $step_y = max(1, (int)floor($scale * $char_aspect * $half_region));
+        // Process every pixel since we've already resized the image appropriately
+        $step_x = 1;
+        $step_y = 1;
         
         // Get ANSI color palette
         $ansi_palette = $this->getAnsiColorPalette();
