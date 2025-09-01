@@ -40,8 +40,8 @@ return [
                 'anthropic/claude-3-haiku' => 'Claude 3 Haiku (Fast)',
                 
                 // Google Models - WITH Function Support
+                'google/gemini-2.5-flash-lite' => 'Gemini 2.5 Flash Lite (💰 3x Cheaper!, Functions)',
                 'google/gemini-2.5-flash' => 'Gemini 2.5 Flash (💰 Affordable, Functions)',
-                'google/gemini-2.5-flash-lite' => 'Gemini 2.5 Flash Lite (💰 Super Cheap)',
                 'google/gemini-pro-1.5' => 'Gemini Pro 1.5 (Google)',
                 'google/gemini-flash-1.5' => 'Gemini Flash 1.5 (Fast)',
                 
@@ -65,7 +65,7 @@ return [
                 // xAI
                 'x-ai/grok-beta' => 'Grok Beta (xAI)',
             ],
-            'default_model' => 'google/gemini-2.5-flash-image-preview:free',
+            'default_model' => 'google/gemini-2.5-flash-lite',
             'supports_functions' => true,
             'headers' => [
                 'Content-Type' => 'application/json',
@@ -152,8 +152,19 @@ return [
         - DC (Difficulty Class) is a number between 4 and 18, representing the challenge's difficulty
         - Example: [Wisdom DC:12] for discerning ancient knowledge
         
-        Each option should be a single, elegantly crafted sentence that includes both the skill check and 1-2 relevant, thematic emojis. Format each option like this:
-        '🔍 Examine the ancient runes etched into the archway [Intellect DC:12]'
+        Format each option with ONE emoji at the start and the skill check at the end.
+        DO NOT include numbers - the game adds them automatically.
+        
+        CORRECT FORMAT (without numbers):
+        🔍 Examine the ancient runes etched into the archway [Intellect DC:12]
+        🌿 Search for medicinal herbs among the phosphorescent flora [Wisdom DC:10]
+        ⚔️ Draw your blade and advance cautiously [Strength DC:8]
+        🎭 Attempt to recall tales of this ancient place [Knowledge DC:14]
+        
+        Each option MUST start with an emoji, followed by the action, ending with [Skill DC:X]
+        Pattern: [emoji] [action description] [skill check]
+        
+        Generate unique, contextually appropriate actions for each scene.
 
         When a skill check has been made:
         - For SUCCESS: Describe the character accomplishing their goal, possibly with additional benefits

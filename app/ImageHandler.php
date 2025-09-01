@@ -82,18 +82,17 @@ class ImageHandler {
         // Create prompt for 8-bit pixel art generation
         // Note: Gemini through OpenRouter seems to generate square images by default
         // We'll request widescreen but may need to crop/adjust in post-processing
-        $image_prompt = "Generate a widescreen 16:9 aspect ratio 8-bit pixel art image. " .
+        $image_prompt = "Generate a ratio 1:1 aspect ratio 8-bit pixel art image. " .
                        "The image must be in landscape orientation, wider than it is tall. " .
                        "Content: $prompt. " .
-                       "Style: retro gaming, limited color palette, nostalgic 8-bit graphics, pixelated. " .
-                       "Format: 16:9 widescreen aspect ratio, landscape orientation.";
+                       "Style: retro gaming, limited color palette, nostalgic 8-bit graphics, pixelated. ";
         
         $data = [
             'model' => $model,
             'messages' => [
                 [
                     'role' => 'system',
-                    'content' => 'You are an image generation AI. Always generate images in 16:9 widescreen format (landscape orientation).'
+                    'content' => 'You are an image generation AI.'
                 ],
                 [
                     'role' => 'user',
