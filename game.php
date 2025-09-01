@@ -177,10 +177,11 @@ if ($debug) {
 }
 
 // Test audio generation (DEBUG ONLY)
-if ($debug) {
-    write_debug_log("Testing audio generation API");
-    $audioHandler->testAudioGeneration();
-}
+// Disabled temporarily to avoid startup delays
+// if ($debug) {
+//     write_debug_log("Testing audio generation API");
+//     $audioHandler->testAudioGeneration();
+// }
 
 $apiHandler = new ApiHandler($config, $providerManager, $gameState, $debug);
 write_debug_log("ApiHandler initialized with ProviderManager and CharacterStats integration", [
@@ -229,7 +230,12 @@ if (in_array('--new', $argv)) {
     
     // Display current AI configuration
     $provider_config = $providerManager->getProviderConfig();
-    echo Utils::colorize("\n[dim]Using " . $provider_config['name'] . " - " . $provider_config['models'][$providerManager->getModel()] . "[/dim]\n");
+    $model_display = $providerManager->getModel();
+    // Try to get the display name, fallback to model ID if not found
+    if (isset($provider_config['models'][$model_display])) {
+        $model_display = $provider_config['models'][$model_display];
+    }
+    echo Utils::colorize("\n[dim]Using " . $provider_config['name'] . " - " . $model_display . "[/dim]\n");
     
     if (!$useChunky) {
         echo Utils::colorize("\n[yellow]TIP: You can use --chunky flag for enhanced ASCII art! Restart with: php game.php --chunky[/yellow]\n\n");
@@ -311,8 +317,15 @@ if ($should_make_api_call) {
                 write_debug_log("API response received", $response);
             }
             
-            // Store as function_call for backward compatibility
-            $gameState->addMessage('assistant', '', ['name' => 'GameResponse', 'arguments' => json_encode($response)]);
+            // Store as tool_calls for OpenRouter format
+            $gameState->addMessage('assistant', '', null, [
+                [
+                    'function' => [
+                        'name' => 'GameResponse',
+                        'arguments' => json_encode($response)
+                    ]
+                ]
+            ]);
             
             // Convert array to object for compatibility
             $scene_data = json_decode(json_encode($response));
@@ -339,17 +352,10 @@ while (true) {
         static $last_processed_timestamp = 0;
         
         // Extract scene data from the last message if needed
-        // Handle both function_call (old format) and tool_calls (new format)
+        // Handle tool_calls format (OpenRouter only)
         $args = null;
-        if (isset($lastMsg['function_call'])) {
-            // Old format
-            if (is_object($lastMsg['function_call']) && isset($lastMsg['function_call']->arguments)) {
-                $args = $lastMsg['function_call']->arguments;
-            } elseif (is_array($lastMsg['function_call']) && isset($lastMsg['function_call']['arguments'])) {
-                $args = $lastMsg['function_call']['arguments'];
-            }
-        } elseif (isset($lastMsg['tool_calls'])) {
-            // New format for OpenRouter
+        if (isset($lastMsg['tool_calls'])) {
+            // OpenRouter format
             if (is_array($lastMsg['tool_calls']) && isset($lastMsg['tool_calls'][0]['function']['arguments'])) {
                 $args = $lastMsg['tool_calls'][0]['function']['arguments'];
             }
@@ -436,7 +442,12 @@ while (true) {
                     
                     // Display current AI configuration
                     $provider_config = $providerManager->getProviderConfig();
-                    echo Utils::colorize("\n[dim]Using " . $provider_config['name'] . " - " . $provider_config['models'][$providerManager->getModel()] . "[/dim]\n");
+                    $model_display = $providerManager->getModel();
+                    // Try to get the display name, fallback to model ID if not found
+                    if (isset($provider_config['models'][$model_display])) {
+                        $model_display = $provider_config['models'][$model_display];
+                    }
+                    echo Utils::colorize("\n[dim]Using " . $provider_config['name'] . " - " . $model_display . "[/dim]\n");
                     
                     if (!$useChunky) {
                         echo Utils::colorize("\n[yellow]TIP: You can use --chunky flag for enhanced ASCII art! Restart with: php game.php --chunky[/yellow]\n\n");
@@ -634,8 +645,15 @@ while (true) {
                     write_debug_log("API response received", $response);
                 }
                 
-                // Store as function_call for backward compatibility
-                $gameState->addMessage('assistant', '', ['name' => 'GameResponse', 'arguments' => json_encode($response)]);
+                // Store as tool_calls for OpenRouter format
+                $gameState->addMessage('assistant', '', null, [
+                    [
+                        'function' => [
+                            'name' => 'GameResponse',
+                            'arguments' => json_encode($response)
+                        ]
+                    ]
+                ]);
                 
                 // Convert array to object for compatibility
                 $scene_data = json_decode(json_encode($response));

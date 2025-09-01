@@ -189,43 +189,18 @@ class ProviderManager {
         echo Utils::colorize("[bold][yellow]        AI Provider Configuration Setup[/yellow][/bold]\n");
         echo Utils::colorize("[bold][cyan]═══════════════════════════════════════════════════════[/cyan][/bold]\n\n");
         
-        // Select provider
-        echo Utils::colorize("[bold]Select your AI provider:[/bold]\n\n");
-        $providers = array_keys($this->config['providers']);
-        foreach ($providers as $i => $provider) {
-            $provider_config = $this->config['providers'][$provider];
-            echo Utils::colorize(sprintf(
-                "[cyan]%d.[/cyan] [green]%s[/green]\n",
-                $i + 1,
-                $provider_config['name']
-            ));
-        }
-        
-        echo "\n";
-        $choice = null;
-        while ($choice === null) {
-            $input = readline(Utils::colorize("[cyan]Enter your choice (1-" . count($providers) . "): [/cyan]"));
-            $choice_num = intval($input);
-            if ($choice_num >= 1 && $choice_num <= count($providers)) {
-                $choice = $providers[$choice_num - 1];
-            } else {
-                echo Utils::colorize("[red]Invalid choice. Please try again.[/red]\n");
-            }
-        }
-        
-        $this->provider = $choice;
+        // OpenRouter is our only provider
+        $this->provider = 'openrouter';
         $provider_config = $this->config['providers'][$this->provider];
         
-        echo Utils::colorize("\n[green]Selected: " . $provider_config['name'] . "[/green]\n\n");
+        echo Utils::colorize("[bold]Using OpenRouter for all AI models[/bold]\n");
+        echo Utils::colorize("[dim]Access to 400+ models including OpenAI, Anthropic, Google, and more![/dim]\n\n");
         
         // Get API key
         echo Utils::colorize("[bold]Enter your API key:[/bold]\n");
         
-        if ($this->provider === 'openai') {
-            echo Utils::colorize("[dim]Get your API key from: https://platform.openai.com/api-keys[/dim]\n");
-        } else if ($this->provider === 'openrouter') {
-            echo Utils::colorize("[dim]Get your API key from: https://openrouter.ai/keys[/dim]\n");
-        }
+        // OpenRouter is our only provider now
+        echo Utils::colorize("[dim]Get your API key from: https://openrouter.ai/keys[/dim]\n");
         
         echo "\n";
         $this->api_key = trim(readline(Utils::colorize("[cyan]API Key: [/cyan]")));
@@ -233,8 +208,9 @@ class ProviderManager {
         // Select model
         echo Utils::colorize("\n[bold]Select your preferred model:[/bold]\n\n");
         
-        // Get models based on provider
-        if ($this->provider === 'openrouter') {
+        // Get models for OpenRouter (our only provider)
+        // Always fetch dynamic model list for OpenRouter
+        if (true) {
             // Fetch dynamic model list for OpenRouter
             $all_models = $this->fetchOpenRouterModels();
             $models = array_keys($all_models);
@@ -444,30 +420,6 @@ class ProviderManager {
                             echo Utils::colorize("[red]Model not found. Please try again.[/red]\n");
                         }
                     }
-                }
-            }
-        } else {
-            // For other providers (like OpenAI), use static config
-            $models = array_keys($provider_config['models']);
-            
-            // Simple list for OpenAI
-            foreach ($models as $i => $model) {
-                echo Utils::colorize(sprintf(
-                    "[cyan]%d.[/cyan] [green]%s[/green]\n",
-                    $i + 1,
-                    $provider_config['models'][$model]
-                ));
-            }
-            
-            echo "\n";
-            $model_choice = null;
-            while ($model_choice === null) {
-                $input = readline(Utils::colorize("[cyan]Enter your choice (1-" . count($models) . "): [/cyan]"));
-                $choice_num = intval($input);
-                if ($choice_num >= 1 && $choice_num <= count($models)) {
-                    $model_choice = $models[$choice_num - 1];
-                } else {
-                    echo Utils::colorize("[red]Invalid choice. Please try again.[/red]\n");
                 }
             }
         }

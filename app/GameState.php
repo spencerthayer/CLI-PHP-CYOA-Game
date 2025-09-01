@@ -111,7 +111,7 @@ class GameState {
         return $this->conversation;
     }
     
-    public function addMessage($role, $content, $function_call = null) {
+    public function addMessage($role, $content, $function_call = null, $tool_calls = null) {
         $message = [
             'role' => $role,
             'content' => $content,
@@ -120,6 +120,10 @@ class GameState {
         
         if ($function_call) {
             $message['function_call'] = $function_call;
+        }
+        
+        if ($tool_calls) {
+            $message['tool_calls'] = $tool_calls;
         }
         
         if ($this->debug) {

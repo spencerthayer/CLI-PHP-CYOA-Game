@@ -109,10 +109,9 @@ class AudioHandler {
             $ts    = time();
             $file  = "{$this->tmp_dir}/speech_{$ts}_{$i}.mp3";
 
-            // wrap in Say: "…"
-            $prompt = 'Say: "' . $chunk . '"';
+            // Direct text without "Say:" wrapper
             $url    = "https://text.pollinations.ai/"
-                    . rawurlencode($prompt)
+                    . rawurlencode($chunk)
                     . "?model=openai-audio&voice=" . rawurlencode($voice);
 
             $cancelFlag = sys_get_temp_dir() . "/audio_cancel.flag";

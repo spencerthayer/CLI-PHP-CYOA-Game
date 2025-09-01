@@ -394,17 +394,14 @@ class ApiHandler {
     }
 
     private function processApiResponse($response_data) {
-        // Handle both function_call (OpenAI) and tool_calls (OpenRouter) formats
+        // Handle tool_calls format (OpenRouter only)
         $function_args = null;
         
-        if (isset($response_data['choices'][0]['message']['function_call'])) {
-            // OpenAI format
-            $function_args = json_decode($response_data['choices'][0]['message']['function_call']['arguments'], true);
-        } else if (isset($response_data['choices'][0]['message']['tool_calls'][0]['function']['arguments'])) {
+        if (isset($response_data['choices'][0]['message']['tool_calls'][0]['function']['arguments'])) {
             // OpenRouter/tools format
             $function_args = json_decode($response_data['choices'][0]['message']['tool_calls'][0]['function']['arguments'], true);
         } else {
-            throw new \Exception("Unexpected API response format - no function_call or tool_calls found");
+            throw new \Exception("Unexpected API response format - no tool_calls found");
         }
         
         if (!$function_args) {
@@ -564,24 +561,17 @@ class ApiHandler {
             )
         ];
         
-        // Use tools format for OpenRouter, functions format for OpenAI
-        if ($provider === 'openrouter') {
-            // OpenRouter uses tools format
-            $data['tools'] = [
-                [
-                    'type' => 'function',
-                    'function' => $function_schema
-                ]
-            ];
-            $data['tool_choice'] = [
+        // Always use tools format (OpenRouter is our only provider)
+        $data['tools'] = [
+            [
                 'type' => 'function',
-                'function' => ['name' => 'GameResponse']
-            ];
-        } else {
-            // OpenAI uses functions format
-            $data['functions'] = [$function_schema];
-            $data['function_call'] = ['name' => 'GameResponse'];
-        }
+                'function' => $function_schema
+            ]
+        ];
+        $data['tool_choice'] = [
+            'type' => 'function',
+            'function' => ['name' => 'GameResponse']
+        ];
         
         // Add any provider-specific extra parameters
         $extra_params = $this->provider_manager->getExtraBodyParams();

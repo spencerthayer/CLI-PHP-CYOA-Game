@@ -13,28 +13,20 @@ return [
     
     // Provider configurations
     'providers' => [
-        'openai' => [
-            'name' => 'OpenAI',
-            'base_url' => 'https://api.openai.com/v1',
-            'chat_endpoint' => '/chat/completions',
-            'models' => [
-                'gpt-4o-mini' => 'GPT-4o Mini (Fast, Affordable)',
-                'gpt-4o' => 'GPT-4o (Most Capable)',
-                'gpt-4-turbo' => 'GPT-4 Turbo (Legacy)',
-                'gpt-3.5-turbo' => 'GPT-3.5 Turbo (Legacy, Fast)',
-            ],
-            'default_model' => 'gpt-4o-mini',
-            'supports_functions' => true,
-            'headers' => [
-                'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer {API_KEY}'
-            ]
-        ],
         'openrouter' => [
             'name' => 'OpenRouter',
             'base_url' => 'https://openrouter.ai/api/v1',
             'chat_endpoint' => '/chat/completions',
             'models' => [
+                // FREE Models with Function Support
+                'google/gemini-2.5-flash-image-preview:free' => 'Gemini 2.5 Flash (🆓 FREE, Functions)',
+                'openai/gpt-oss-120b:free' => 'GPT OSS 120B (🆓 FREE, Functions)',
+                'openai/gpt-oss-20b:free' => 'GPT OSS 20B (🆓 FREE, Functions)',
+                
+                // FREE Models without Function Support
+                'cognitivecomputations/dolphin-mistral-24b-venice-edition:free' => 'Venice: Uncensored (🆓 FREE)',
+                'deepseek/deepseek-chat-v3.1:free' => 'DeepSeek Chat V3.1 (🆓 FREE)',
+                
                 // OpenAI Models via OpenRouter
                 'openai/gpt-4o' => 'GPT-4o (OpenAI)',
                 'openai/gpt-4o-mini' => 'GPT-4o Mini (OpenAI)',
@@ -47,7 +39,9 @@ return [
                 'anthropic/claude-3-sonnet' => 'Claude 3 Sonnet (Balanced)',
                 'anthropic/claude-3-haiku' => 'Claude 3 Haiku (Fast)',
                 
-                // Google Models
+                // Google Models - WITH Function Support
+                'google/gemini-2.5-flash' => 'Gemini 2.5 Flash (💰 Affordable, Functions)',
+                'google/gemini-2.5-flash-lite' => 'Gemini 2.5 Flash Lite (💰 Super Cheap)',
                 'google/gemini-pro-1.5' => 'Gemini Pro 1.5 (Google)',
                 'google/gemini-flash-1.5' => 'Gemini Flash 1.5 (Fast)',
                 
@@ -71,7 +65,7 @@ return [
                 // xAI
                 'x-ai/grok-beta' => 'Grok Beta (xAI)',
             ],
-            'default_model' => 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
+            'default_model' => 'google/gemini-2.5-flash',
             'supports_functions' => true,
             'headers' => [
                 'Content-Type' => 'application/json',
