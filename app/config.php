@@ -104,7 +104,7 @@ return [
     'image' => [
         'scale' => 4, // Scale factor for ASCII art conversion
         'max_width' => 100, // Maximum width for ASCII art
-        'max_height' => 40, // Maximum height for ASCII art
+        'max_height' => 1001, // Maximum height for ASCII art
         
         // Image generation service configuration
         'generation_service' => 'openrouter', // Using Google Gemini only
@@ -114,7 +114,7 @@ return [
         'openrouter' => [
             'model' => 'google/gemini-2.5-flash-image-preview:free',
             'enabled' => true,
-            'timeout' => 40,
+            'timeout' => 60,
             // Note: Generates 1024x1024 square images only (1:1 aspect ratio)
             // Cost: $0.039 per image (1290 output tokens at $30/1M tokens)
         ],
