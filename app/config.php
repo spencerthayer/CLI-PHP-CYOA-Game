@@ -65,7 +65,7 @@ return [
                 // xAI
                 'x-ai/grok-beta' => 'Grok Beta (xAI)',
             ],
-            'default_model' => 'google/gemini-2.5-flash',
+            'default_model' => 'google/gemini-2.5-flash-image-preview:free',
             'supports_functions' => true,
             'headers' => [
                 'Content-Type' => 'application/json',
@@ -98,6 +98,34 @@ return [
         'max_custom_action_length' => 512,
         'generate_image_toggle' => true,
         'audio_toggle' => false,
+    ],
+    
+    // Image generation settings
+    'image' => [
+        'scale' => 4, // Scale factor for ASCII art conversion
+        'max_width' => 100, // Maximum width for ASCII art
+        'max_height' => 30, // Maximum height for ASCII art
+        
+        // Image generation service configuration
+        'generation_service' => 'pollinations', // Options: 'openrouter', 'pollinations', 'both'
+        'prefer_openrouter' => false, // Gemini only generates square images (1:1), not suitable for our needs
+        
+        // OpenRouter settings - Gemini 2.5 Flash Image Preview (LIMITATION: Only generates 1:1 square images)
+        'openrouter' => [
+            'model' => 'google/gemini-2.5-flash-image-preview:free',
+            'enabled' => false, // Disabled due to square-only limitation
+            'timeout' => 30,
+            // Would cost $0.039 per image but doesn't support custom aspect ratios
+        ],
+        
+        // Pollinations settings (free and supports 16:9!) - Primary service
+        'pollinations' => [
+            'model' => 'turbo', // 'turbo' (fast, reliable) or 'flux' (better but often down)
+            'width' => 640,  // 16:9 aspect ratio - WORKS!
+            'height' => 360, // 16:9 aspect ratio - WORKS!
+            'timeout' => 20,
+            'fallback_on_failure' => true, // Fall back to no image if generation fails
+        ],
     ],
     
     'audio' => [
