@@ -83,7 +83,7 @@ class ImageHandler {
         // Note: Gemini through OpenRouter seems to generate square images by default
         // We'll request widescreen but may need to crop/adjust in post-processing
         $image_prompt = "Generate a ratio 1:1 aspect ratio 8-bit pixel art image. " .
-                       "The image must be in landscape orientation, wider than it is tall. " .
+                       "The image must not contain any English text, unless it's part of the `Content:` prompt." .
                        "Content: $prompt. " .
                        "Style: retro gaming, limited color palette, nostalgic 8-bit graphics, pixelated. ";
         
@@ -111,16 +111,30 @@ class ImageHandler {
             'X-Title: The Dying Earth CLI Game'
         ];
         
-        $ch = curl_init('https://openrouter.ai/api/v1/chat/completions');
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        // Use spinner while making the API call
+        $utils = new Utils();
+        $response = null;
+        $http_code = null;
         
-        $response = curl_exec($ch);
-        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        $api_success = $utils->runWithSpinnerAndCancellation(function() use ($data, $headers, &$response, &$http_code) {
+            $ch = curl_init('https://openrouter.ai/api/v1/chat/completions');
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            
+            $response = curl_exec($ch);
+            $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            return $response !== false;
+        }, 'image');
+        
+        if (!$api_success) {
+            write_debug_log("OpenRouter API call cancelled or failed");
+            return false;
+        }
         
         if ($http_code !== 200) {
             write_debug_log("OpenRouter API error", ['http_code' => $http_code, 'response' => substr($response, 0, 500)]);
