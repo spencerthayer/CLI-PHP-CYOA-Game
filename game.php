@@ -237,9 +237,9 @@ if (in_array('--new', $argv)) {
     }
     echo Utils::colorize("\n[dim]Using " . $provider_config['name'] . " - " . $model_display . "[/dim]\n");
     
-    if (!$useChunky) {
-        echo Utils::colorize("\n[yellow]TIP: You can use --chunky flag for enhanced ASCII art! Restart with: php game.php --chunky[/yellow]\n\n");
-    }
+    // if (!$useChunky) {
+    //     echo Utils::colorize("\n[yellow]TIP: You can use --chunky flag for enhanced ASCII art! Restart with: php game.php --chunky[/yellow]\n\n");
+    // }
     
     $imageHandler->clearImages();
     $audioHandler->clearAudioFiles();
@@ -449,9 +449,9 @@ while (true) {
                     }
                     echo Utils::colorize("\n[dim]Using " . $provider_config['name'] . " - " . $model_display . "[/dim]\n");
                     
-                    if (!$useChunky) {
-                        echo Utils::colorize("\n[yellow]TIP: You can use --chunky flag for enhanced ASCII art! Restart with: php game.php --chunky[/yellow]\n\n");
-                    }
+                    // if (!$useChunky) {
+                    //     echo Utils::colorize("\n[yellow]TIP: You can use --chunky flag for enhanced ASCII art! Restart with: php game.php --chunky[/yellow]\n\n");
+                    // }
                     
                     $imageHandler->clearImages();
                     $audioHandler->clearAudioFiles();
@@ -537,8 +537,10 @@ while (true) {
                     $chosen_option = $current_options[$user_input - 1];
                     
                     // Check for various types of checks in the option text
+                    // Support both [Attribute DC:X] and legacy [SKILL_CHECK:Attribute:X] formats
                     $check_patterns = [
-                        'SKILL_CHECK' => '/\[SKILL_CHECK:(\w+):(\d+)\]/',
+                        'ATTRIBUTE_CHECK' => '/\[(\w+)\s+DC:(\d+)\]/',  // New format: [Knowledge DC:15]
+                        'SKILL_CHECK' => '/\[SKILL_CHECK:(\w+):(\d+)\]/', // Legacy format
                         'SAVE' => '/\[SAVE:(\w+):(\d+)\]/',
                         'SANITY_CHECK' => '/\[SANITY_CHECK:(\d+)\]/'
                     ];
@@ -548,6 +550,7 @@ while (true) {
                             $result = null;
                             
                             switch ($check_type) {
+                                case 'ATTRIBUTE_CHECK':
                                 case 'SKILL_CHECK':
                                     $attribute = $matches[1];
                                     $difficulty = intval($matches[2]);

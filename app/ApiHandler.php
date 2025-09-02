@@ -433,8 +433,27 @@ class ApiHandler {
             $this->game_state->clearLastCheckResult();
         }
 
-        // Handle options format compatibility
-        if (isset($function_args['options']) && !is_array($function_args['options'])) {
+        // Handle options format - convert new format to display format
+        if (isset($function_args['options']) && is_array($function_args['options'])) {
+            $formatted_options = [];
+            foreach ($function_args['options'] as $option) {
+                if (is_object($option) || is_array($option)) {
+                    // New format with separated emoji, text, and skill_check
+                    $opt = (array)$option;
+                    $emoji = isset($opt['emoji']) ? $opt['emoji'] : '';
+                    $text = isset($opt['text']) ? $opt['text'] : '';
+                    $skill_check = isset($opt['skill_check']) ? $opt['skill_check'] : '';
+                    
+                    // Combine with proper spacing
+                    $formatted_options[] = trim($emoji . ' ' . $text . ' ' . $skill_check);
+                } else {
+                    // Legacy format - keep as is
+                    $formatted_options[] = $option;
+                }
+            }
+            $function_args['options'] = $formatted_options;
+        } else if (isset($function_args['options']) && !is_array($function_args['options'])) {
+            // Old branching format
             $function_args['options'] = array_values((array)$function_args['options']);
         }
         
@@ -456,40 +475,72 @@ class ApiHandler {
         $skill_check_narrative = "";
         
         if ($has_skill_check) {
-            // Pre-roll the skill check based on the action's DC
             $attribute = $matches[1];
             $difficulty = intval($matches[2]);
-            $stats = $this->game_state->getCharacterStats();
             
-            // Handle different types of checks
-            if (in_array($attribute, ['Agility', 'Appearance', 'Charisma', 'Dexterity', 'Endurance', 'Intellect', 'Knowledge', 'Luck', 'Perception', 'Spirit', 'Strength', 'Vitality', 'Willpower', 'Wisdom'])) {
-                $check_result = $stats->skillCheck($attribute, $difficulty);
-                // Display the roll result
-                echo "\n🎲 " . $attribute . " Check: " . $check_result['roll'] . " + " . $check_result['modifier'] . " (modifier) = " . 
-                     $check_result['roll'] + $check_result['modifier'] . " vs DC " . $difficulty . " - " . ($check_result['success'] ? "Success!" : "Failure!") . "\n\n";
+            // Get the last check result that was already performed in game.php
+            $check_result = $this->game_state->getLastCheckResult();
+            
+            if (!$check_result) {
+                // Fallback: If no check result stored, perform it now (shouldn't normally happen)
+                $stats = $this->game_state->getCharacterStats();
                 
-                // Create a narrative description of the skill check result
-                $skill_check_narrative = "\n[SKILL CHECK RESULT: " . $attribute . " roll of " . 
-                    ($check_result['roll'] + $check_result['modifier']) . " vs DC " . $difficulty . " - " . 
-                    ($check_result['success'] ? "SUCCESS" : "FAILURE") . ". " .
-                    "The player " . ($check_result['success'] ? "succeeded in their attempt" : "failed in their attempt") . ".]\n";
-            } else {
-                $check_result = $stats->savingThrow($attribute, $difficulty);
-                // Display the roll result
-                echo "\n🎲 " . $attribute . " Save: " . $check_result['roll'] . " + " . $check_result['modifier'] . " (modifier) = " . 
-                     $check_result['roll'] + $check_result['modifier'] . " vs DC " . $difficulty . " - " . ($check_result['success'] ? "Success!" : "Failure!") . "\n\n";
-                
-                // Create a narrative description of the saving throw result
-                $skill_check_narrative = "\n[SAVING THROW RESULT: " . $attribute . " roll of " . 
-                    ($check_result['roll'] + $check_result['modifier']) . " vs DC " . $difficulty . " - " . 
-                    ($check_result['success'] ? "SUCCESS" : "FAILURE") . ". " .
-                    "The player " . ($check_result['success'] ? "resisted the effect" : "failed to resist") . ".]\n";
+                if (in_array($attribute, ['Agility', 'Appearance', 'Charisma', 'Dexterity', 'Endurance', 'Intellect', 'Knowledge', 'Luck', 'Perception', 'Spirit', 'Strength', 'Vitality', 'Willpower', 'Wisdom'])) {
+                    $check_result = $stats->skillCheck($attribute, $difficulty);
+                    // Don't display here - it was already displayed in game.php
+                } else {
+                    $check_result = $stats->savingThrow($attribute, $difficulty);
+                }
             }
             
-            $this->game_state->setLastCheckResult($check_result);
+            if ($check_result) {
+                // Calculate the margin of success/failure for gradient feedback
+                $total_roll = $check_result['roll'] + $check_result['modifier'];
+                $margin = $total_roll - $difficulty;
+                $severity = "";
+                
+                if ($check_result['success']) {
+                    if ($margin >= 10) {
+                        $severity = "CRITICAL SUCCESS";
+                    } elseif ($margin >= 5) {
+                        $severity = "GREAT SUCCESS";
+                    } elseif ($margin >= 0) {
+                        $severity = "SUCCESS";
+                    }
+                } else {
+                    if ($margin <= -10) {
+                        $severity = "CRITICAL FAILURE";
+                    } elseif ($margin <= -5) {
+                        $severity = "MAJOR FAILURE";
+                    } else {
+                        $severity = "FAILURE";
+                    }
+                }
+                
+                // Create a narrative description of the skill check result with gradient feedback
+                $skill_check_narrative = "\n[SKILL CHECK RESULT: " . $attribute . " roll of " . 
+                    $total_roll . " vs DC " . $difficulty . " - " . $severity . " (margin: " . 
+                    ($margin >= 0 ? "+" : "") . $margin . ").\n" .
+                    "IMPORTANT: The player's action " . ($check_result['success'] ? "SUCCEEDS" : "FAILS") . 
+                    ". Write the narrative accordingly. " .
+                    ($check_result['success'] 
+                        ? ($margin >= 10 ? "This is an exceptional success - describe remarkable results beyond expectations." 
+                           : ($margin >= 5 ? "This is a solid success - describe competent achievement with some bonus." 
+                              : "This is a narrow success - describe barely making it work."))
+                        : ($margin <= -10 ? "This is a catastrophic failure - describe terrible consequences and complications." 
+                           : ($margin <= -5 ? "This is a significant failure - describe clear setbacks and problems." 
+                              : "This is a close failure - describe falling just short with minor consequences."))
+                    ) . "]\n";
+            }
             
-            // Add the skill check result to the conversation history
-            $this->game_state->addMessage('system', $skill_check_narrative);
+            if ($check_result) {
+                $this->game_state->setLastCheckResult($check_result);
+                
+                // Add the skill check result to the conversation history
+                if (!empty($skill_check_narrative)) {
+                    $this->game_state->addMessage('system', $skill_check_narrative);
+                }
+            }
             
             if ($this->debug) {
                 write_debug_log("Action Check Result", [
@@ -531,11 +582,27 @@ class ApiHandler {
                     'options' => [
                         'type' => 'array',
                         'items' => [
-                            'type' => 'string'
+                            'type' => 'object',
+                            'properties' => [
+                                'emoji' => [
+                                    'type' => 'string',
+                                    'description' => 'A single emoji representing the action',
+                                    'maxLength' => 2
+                                ],
+                                'text' => [
+                                    'type' => 'string',
+                                    'description' => 'The action description WITHOUT emoji or numbering'
+                                ],
+                                'skill_check' => [
+                                    'type' => 'string',
+                                    'description' => 'The skill check in format [Attribute DC:XX]'
+                                ]
+                            ],
+                            'required' => ['emoji', 'text', 'skill_check']
                         ],
                         'minItems' => 4,
                         'maxItems' => 4,
-                        'description' => 'Exactly 4 options for the player to choose from. Each option should be a string that may include an emoji and optional skill check in format [Attribute DC:XX]'
+                        'description' => 'Exactly 4 options for the player to choose from. Each option is an object with emoji, text, and skill_check fields.'
                     ],
                     'image' => [
                         'type' => 'object',
@@ -562,8 +629,14 @@ class ApiHandler {
                 [
                     [
                         'role' => 'system',
-                        'content' => "You are narrating a dark fantasy RPG game. Provide immersive narrative descriptions but DO NOT include the options list in the narrative - options will be displayed separately. Each action choice MUST include a skill check in the format [Attribute DC:difficulty], where difficulty is between " . $this->config['difficulty_range']['min'] . " and " . $this->config['difficulty_range']['max'] . ", representing a range from trivial to nearly impossible challenges. Use emojis to enhance the presentation of choices." . 
-                            "\n\nIMPORTANT: Build upon the previous narrative and skill check results. When a skill check fails, provide alternative paths or consequences, not the same challenge again. Progress the story based on successes and failures." .
+                        'content' => "You are narrating a dark fantasy RPG game. Provide immersive narrative descriptions but DO NOT include the options list in the narrative - options will be displayed separately.\n\n" .
+                            "FORMAT FOR OPTIONS:\n" .
+                            "- Each option must be an object with 'emoji', 'text', and 'skill_check' fields\n" .
+                            "- emoji: A single emoji representing the action (e.g., '🔍', '⚔️', '🌿')\n" .
+                            "- text: The action description WITHOUT emoji, numbers, or skill check\n" .
+                            "- skill_check: The check in format [Attribute DC:XX] where DC is between " . $this->config['difficulty_range']['min'] . " and " . $this->config['difficulty_range']['max'] . "\n\n" .
+                            "DO NOT include numbers in your options - numbering is handled by the game.\n\n" .
+                            "IMPORTANT: Build upon the previous narrative and skill check results. When a skill check fails, provide alternative paths or consequences, not the same challenge again. Progress the story based on successes and failures." .
                             "\n\nThe player's current stats are:\n" .
                             "Primary Attributes:\n" .
                             $formattedStats .

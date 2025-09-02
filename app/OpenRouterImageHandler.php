@@ -164,7 +164,7 @@ class OpenRouterImageHandler implements ImageGenerationInterface {
         $headers = [
             'Content-Type: application/json',
             'Authorization: Bearer ' . $this->api_key,
-            'HTTP-Referer: https://github.com/the-dying-earth-cli',
+            'HTTP-Referer: https://github.com/spencerthayer/CLI-PHP-CYOA-Game',
             'X-Title: The Dying Earth CLI Game'
         ];
         
