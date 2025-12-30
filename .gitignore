@@ -1,5 +1,6 @@
 # Game data files
 .data/
+.data_archive/
 .openai_api_key
 .game_history
 .user_prefs

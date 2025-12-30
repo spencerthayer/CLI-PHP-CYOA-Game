@@ -573,9 +573,10 @@ while (true) {
                     // Check for various types of checks in the option text
                     // Support multiple formats for attribute checks:
                     // - [Attribute DC:X] e.g., [Perception DC:8]
+                    // - Attribute DC:X (without brackets) e.g., Perception DC:8
                     // - [Attribute modifier:X] e.g., [Perception -1:8], [Agility 0:10], [Strength +2:12]
                     $check_patterns = [
-                        'ATTRIBUTE_CHECK' => '/\[(\w+)\s+(?:DC:|[+-]?\d+:)(\d+)\]/',  // Matches both DC:X and modifier:X formats
+                        'ATTRIBUTE_CHECK' => '/\[?(\w+)\s+(?:DC:|[+-]?\d+:)\s*(\d+)\]?/',  // Brackets optional, matches DC:X and modifier:X
                         'SKILL_CHECK' => '/\[SKILL_CHECK:(\w+):(\d+)\]/', // Legacy format
                         'SAVE' => '/\[SAVE:(\w+):(\d+)\]/',
                         'SANITY_CHECK' => '/\[SANITY_CHECK:(\d+)\]/'
