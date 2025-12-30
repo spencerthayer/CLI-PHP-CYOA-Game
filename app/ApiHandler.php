@@ -1022,23 +1022,30 @@ class ApiHandler {
                 throw new \Exception("Authentication failed. Please check your API key.");
             } else if ($http_code === 429) {
                 throw new \Exception("Rate limit exceeded. Please wait a moment and try again.");
-            } else if ($http_code === 404 || $http_code === 400) {
+            } else if ($http_code === 404) {
                 $model = $this->provider_manager->getModel();
-                // Check if error mentions tools/functions not supported
-                if (strpos($error_message, 'tool') !== false || 
-                    strpos($error_message, 'function') !== false ||
-                    strpos($error_message, 'not supported') !== false ||
-                    $http_code === 404) {
+                throw new \Exception(
+                    "Model '$model' not found or unavailable.\n" .
+                    "OpenRouter error: $error_message\n" .
+                    "Try running 'php game.php --setup' to select a different model."
+                );
+            } else if ($http_code === 400) {
+                $model = $this->provider_manager->getModel();
+                // Check if error specifically mentions tools/functions
+                $error_lower = strtolower($error_message);
+                if (strpos($error_lower, 'tool') !== false || 
+                    strpos($error_lower, 'function') !== false) {
                     throw new \Exception(
                         "Model '$model' doesn't support tool calling (required for this game).\n" .
-                        "Run 'php game.php --setup' and select a model that supports tools.\n" .
-                        "Recommended: openrouter/auto, google/gemini-2.0-flash-001, anthropic/claude-3-haiku"
+                        "OpenRouter error: $error_message\n" .
+                        "Run 'php game.php --setup' and select a model that supports tools."
                     );
                 }
-                throw new \Exception("Model not found: $model. Please check your model selection.");
+                // Show actual error for other 400 errors
+                throw new \Exception("API error (400) for model '$model': $error_message");
             }
             
-            throw new \Exception("API call failed with HTTP code $http_code: $error_message");
+            throw new \Exception("API call failed (HTTP $http_code): $error_message");
         }
 
         $response_data = json_decode($response, true);

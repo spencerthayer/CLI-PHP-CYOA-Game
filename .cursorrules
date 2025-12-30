@@ -59,5 +59,25 @@ When encountering issues:
 - Keep documentation in sync with code changes
 - Document command-line options and configurations
 
+### 9. NO HARDCODED MODEL NAMES
+- **NEVER** hardcode specific AI model names or IDs in code (e.g., `gpt-4o`, `claude-3-haiku`, `gemini-2.0-flash`)
+- **NEVER** create blocklists or allowlists of specific models
+- **NEVER** recommend specific models in error messages
+- **ALWAYS** fetch model lists dynamically from the OpenRouter API
+- **TRUST** OpenRouter's `supported_parameters` field to determine model capabilities
+- The only exception is `openrouter/auto` which is OpenRouter's special auto-routing feature, not a specific model
+
+**Why?**
+- Models are added, removed, and updated frequently by providers
+- Model capabilities change over time
+- Hardcoded lists become stale and cause bugs
+- OpenRouter is the authoritative source for model information
+
+**Instead of hardcoding:**
+- Use the OpenRouter API to fetch available models
+- Filter by `supported_parameters` for required features (e.g., 'tools')
+- Show actual API error messages rather than guessing the cause
+- Let users select from dynamically fetched lists
+
 ## Remember
 **Production-first development**: Every change should improve the actual game, not create testing infrastructure. The game itself IS the test environment when run with appropriate flags.

@@ -160,6 +160,9 @@ if (!$providerManager->isConfigured()) {
     exit(1);
 }
 
+// Validate that the configured model supports tool calling (required for this game)
+$providerManager->validateModelSupportsTools();
+
 // CRITICAL: Clear game history BEFORE creating GameState (if --new flag present)
 // This ensures the GameState doesn't load stale data from a previous session
 $starting_new_game = in_array('--new', $argv);
@@ -545,7 +548,7 @@ while (true) {
             default:
                 // Get the current options based on any recent skill check
                 $current_options = [];
-                if (isset($scene_data->options->success) && isset($scene_data->options->failure)) {
+                if ($scene_data && isset($scene_data->options->success) && isset($scene_data->options->failure)) {
                     $conversation = $gameState->getConversation();
                     $last_message = end($conversation);
                     if ($last_message && $last_message['role'] === 'assistant') {
@@ -558,9 +561,9 @@ while (true) {
                     } else {
                         $current_options = $scene_data->options->success;
                     }
-                } else if (is_array($scene_data->options)) {
+                } else if ($scene_data && isset($scene_data->options) && is_array($scene_data->options)) {
                     $current_options = $scene_data->options;
-                } else if (is_object($scene_data->options)) {
+                } else if ($scene_data && isset($scene_data->options) && is_object($scene_data->options)) {
                     // Convert object to array for indexed access
                     $current_options = array_values((array)$scene_data->options);
                 }

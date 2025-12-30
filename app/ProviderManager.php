@@ -68,6 +68,45 @@ class ProviderManager {
     }
     
     /**
+     * Validate that the current model supports tool calling
+     * Returns true if valid, false if user needs to select new model
+     */
+    public function validateModelSupportsTools() {
+        if (!$this->model) {
+            return true; // No model set, will be handled by setup
+        }
+
+        // Auto router always supports tools
+        if ($this->model === 'openrouter/auto') {
+            return true;
+        }
+
+        // Fetch available models (this filters for tool support based on OpenRouter's API)
+        $available_models = $this->fetchOpenRouterModels();
+
+        // Check if current model is in the tool-supporting list
+        if (isset($available_models[$this->model])) {
+            return true;
+        }
+
+        // Model doesn't support tools - prompt user to change
+        echo Utils::colorize("\n[bold][red]⚠️  WARNING: Your saved model doesn't support tool calling![/red][/bold]\n");
+        echo Utils::colorize("[yellow]Model: " . $this->model . "[/yellow]\n");
+        echo Utils::colorize("[dim]This game requires tool/function calling support.[/dim]\n\n");
+        echo Utils::colorize("[cyan]Would you like to select a new model? (y/n): [/cyan]");
+        
+        $response = strtolower(trim(readline()));
+        
+        if ($response === 'y' || $response === 'yes') {
+            return $this->selectModel();
+        }
+        
+        // User declined - warn them but let them try anyway
+        echo Utils::colorize("\n[yellow]Continuing with current model - game may not work properly.[/yellow]\n");
+        return false;
+    }
+    
+    /**
      * Full model data cache for filtering and display
      */
     private $full_model_data = [];
@@ -114,6 +153,7 @@ class ProviderManager {
                     $name = $model['name'] ?? $id;
                     
                     // Check if model supports tool calling (REQUIRED for this game)
+                    // Trust OpenRouter's API - they know which models support tools
                     $supports_tools = false;
                     if (isset($model['supported_parameters']) && is_array($model['supported_parameters'])) {
                         $supports_tools = in_array('tools', $model['supported_parameters']);
@@ -194,9 +234,11 @@ class ProviderManager {
             }
         }
         
-        // Fallback to default models if API fails
-        echo Utils::colorize("[yellow]Could not fetch latest models, using default list.[/yellow]\n");
-        return $this->config['providers']['openrouter']['models'];
+        // API fetch failed - no hardcoded fallback (models expire frequently)
+        echo Utils::colorize("\n[bold][red]ERROR: Could not fetch models from OpenRouter API.[/red][/bold]\n");
+        echo Utils::colorize("[yellow]Please check your internet connection and try again.[/yellow]\n");
+        echo Utils::colorize("[dim]Models must be fetched dynamically as they change frequently.[/dim]\n\n");
+        return [];
     }
     
     /**
@@ -247,15 +289,19 @@ class ProviderManager {
         // Select model
         echo Utils::colorize("\n[bold]Select your preferred model:[/bold]\n\n");
         
-        // Get models for OpenRouter (our only provider)
-        // Always fetch dynamic model list for OpenRouter
-        if (true) {
-            // Fetch dynamic model list for OpenRouter
-            $all_models = $this->fetchOpenRouterModels();
-            $models = array_keys($all_models);
-            
-            // Use fetched models instead of static config
-            $provider_config['models'] = $all_models;
+        // Fetch dynamic model list from OpenRouter API
+        $all_models = $this->fetchOpenRouterModels();
+        
+        // Check if fetch failed
+        if (empty($all_models)) {
+            echo Utils::colorize("[red]Cannot proceed without model list. Please try again later.[/red]\n");
+            return false;
+        }
+        
+        $models = array_keys($all_models);
+        
+        // Use fetched models
+        $provider_config['models'] = $all_models;
             // Organize models for better display - priority providers shown first
             $priority_providers = ['openai', 'anthropic', 'google', 'meta-llama', 'mistralai', 'x-ai', 'deepseek'];
             
@@ -543,7 +589,6 @@ class ProviderManager {
                     }
                 }
             }
-        }
         
         $this->model = $model_choice;
         
@@ -565,16 +610,23 @@ class ProviderManager {
         echo Utils::colorize("\n[bold][cyan]═══════════════════════════════════════════════════════[/cyan][/bold]\n");
         echo Utils::colorize("[bold][yellow]        Change AI Model[/yellow][/bold]\n");
         echo Utils::colorize("[bold][cyan]═══════════════════════════════════════════════════════[/cyan][/bold]\n\n");
-        
+
         $provider_config = $this->config['providers'][$this->provider];
-        
+
         echo Utils::colorize("[dim]Current model: " . $this->model . "[/dim]\n\n");
-        
-        // Fetch dynamic model list for OpenRouter
+
+        // Fetch dynamic model list from OpenRouter API
         $all_models = $this->fetchOpenRouterModels();
-        $models = array_keys($all_models);
         
-        // Use fetched models instead of static config
+        // Check if fetch failed
+        if (empty($all_models)) {
+            echo Utils::colorize("[red]Cannot change model without fetching model list. Please try again later.[/red]\n");
+            return false;
+        }
+        
+        $models = array_keys($all_models);
+
+        // Use fetched models
         $provider_config['models'] = $all_models;
         // Organize models for better display - priority providers shown first
         $priority_providers = ['openai', 'anthropic', 'google', 'meta-llama', 'mistralai', 'x-ai', 'deepseek'];
@@ -772,7 +824,7 @@ class ProviderManager {
         
         echo Utils::colorize("\n[bold][green]✓ Model changed successfully![/green][/bold]\n");
         return true;
-T     }
+    }
     
     /**
      * Get the current provider

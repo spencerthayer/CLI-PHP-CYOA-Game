@@ -17,55 +17,9 @@ return [
             'name' => 'OpenRouter',
             'base_url' => 'https://openrouter.ai/api/v1',
             'chat_endpoint' => '/chat/completions',
-            'models' => [
-                // FREE Models with Function Support
-                'google/gemini-2.5-flash-image-preview:free' => 'Gemini 2.5 Flash (🆓 FREE, Functions)',
-                'openai/gpt-oss-120b:free' => 'GPT OSS 120B (🆓 FREE, Functions)',
-                'openai/gpt-oss-20b:free' => 'GPT OSS 20B (🆓 FREE, Functions)',
-                
-                // FREE Models without Function Support
-                'cognitivecomputations/dolphin-mistral-24b-venice-edition:free' => 'Venice: Uncensored (🆓 FREE)',
-                'deepseek/deepseek-chat-v3.1:free' => 'DeepSeek Chat V3.1 (🆓 FREE)',
-                
-                // OpenAI Models via OpenRouter
-                'openai/gpt-4o' => 'GPT-4o (OpenAI)',
-                'openai/gpt-4o-mini' => 'GPT-4o Mini (OpenAI)',
-                'openai/gpt-4-turbo' => 'GPT-4 Turbo (OpenAI)',
-                'openai/gpt-3.5-turbo' => 'GPT-3.5 Turbo (OpenAI)',
-                
-                // Anthropic Models
-                'anthropic/claude-3.5-sonnet' => 'Claude 3.5 Sonnet (Most Capable)',
-                'anthropic/claude-3-opus' => 'Claude 3 Opus (Creative)',
-                'anthropic/claude-3-sonnet' => 'Claude 3 Sonnet (Balanced)',
-                'anthropic/claude-3-haiku' => 'Claude 3 Haiku (Fast)',
-                
-                // Google Models - WITH Function Support
-                'google/gemini-2.5-flash-lite' => 'Gemini 2.5 Flash Lite (💰 3x Cheaper!, Functions)',
-                'google/gemini-2.5-flash' => 'Gemini 2.5 Flash (💰 Affordable, Functions)',
-                'google/gemini-pro-1.5' => 'Gemini Pro 1.5 (Google)',
-                'google/gemini-flash-1.5' => 'Gemini Flash 1.5 (Fast)',
-                
-                // Meta Models
-                'meta-llama/llama-3.1-405b-instruct' => 'Llama 3.1 405B (Meta)',
-                'meta-llama/llama-3.1-70b-instruct' => 'Llama 3.1 70B (Meta)',
-                
-                // Mistral Models
-                'mistralai/mistral-large' => 'Mistral Large',
-                'mistralai/mixtral-8x7b-instruct' => 'Mixtral 8x7B',
-                
-                // Nous Research
-                'nousresearch/hermes-3-llama-3.1-405b' => 'Hermes 3 405B',
-                
-                // DeepSeek
-                'deepseek/deepseek-chat' => 'DeepSeek Chat',
-                
-                // Qwen
-                'qwen/qwen-2.5-72b-instruct' => 'Qwen 2.5 72B',
-                
-                // xAI
-                'x-ai/grok-beta' => 'Grok Beta (xAI)',
-            ],
-            'default_model' => 'google/gemini-2.5-flash-lite',
+            // Models are fetched dynamically from OpenRouter API
+            // No hardcoded models - they expire and change frequently
+            'models' => [],
             'supports_functions' => true,
             'headers' => [
                 'Content-Type' => 'application/json',
