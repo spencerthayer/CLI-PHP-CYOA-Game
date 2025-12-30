@@ -44,7 +44,7 @@ $useChunky = in_array('--chunky', $argv);
 $setupProvider = in_array('--setup', $argv);
 $showConfig = in_array('--config', $argv);
 $refreshModels = in_array('--refresh-models', $argv);
-$noImages = in_array('--no-images', $argv);
+$noImages = in_array('--no-images', $argv) || in_array('--no-image', $argv);
 $noAudio = in_array('--no-audio', $argv);
 
 // Function to display help message
@@ -55,7 +55,7 @@ function displayHelp() {
     echo Utils::colorize("  [cyan]--new[/cyan]             Start a new game\n");
     echo Utils::colorize("  [cyan]--debug[/cyan]           Enable debug mode\n");
     echo Utils::colorize("  [cyan]--chunky[/cyan]          Use Chunky ASCII art mode\n");
-    echo Utils::colorize("  [cyan]--no-images[/cyan]       Disable image generation\n");
+    echo Utils::colorize("  [cyan]--no-images[/cyan]       Disable image generation (also: --no-image)\n");
     echo Utils::colorize("  [cyan]--no-audio[/cyan]        Disable audio generation\n");
     echo Utils::colorize("  [cyan]--setup[/cyan]           Configure AI provider and model\n");
     echo Utils::colorize("  [cyan]--config[/cyan]          Display current configuration\n");
@@ -225,10 +225,12 @@ if (in_array('--new', $argv)) {
         echo Utils::colorize("\n[green]Chunky ASCII art mode is enabled for enhanced visuals![/green]\n");
     }
     
-    // Display title screen
-    $title_art = $imageHandler->generate1Screen();
-    if ($title_art) {
-        echo "\n" . $title_art . "\n\n";
+    // Display title screen (only if images are enabled)
+    if ($generate_image_toggle) {
+        $title_art = $imageHandler->generate1Screen();
+        if ($title_art) {
+            echo "\n" . $title_art . "\n\n";
+        }
     }
     
     // Display the game's startup message
@@ -437,10 +439,12 @@ while (true) {
                         echo Utils::colorize("\n[green]Chunky ASCII art mode is enabled for enhanced visuals![/green]\n");
                     }
                     
-                    // Generate and display the title screen
-                    $title_screen = $imageHandler->generate1Screen();
-                    if ($title_screen) {
-                        echo $title_screen . "\n";
+                    // Generate and display the title screen (only if images are enabled)
+                    if ($generate_image_toggle) {
+                        $title_screen = $imageHandler->generate1Screen();
+                        if ($title_screen) {
+                            echo $title_screen . "\n";
+                        }
                     }
                     
                     // Display the game's startup message
