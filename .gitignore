@@ -38,3 +38,4 @@ images/
 speech/
 tmp/
 .DS_Store
+app/openrouter_models_cache.json

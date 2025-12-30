@@ -271,7 +271,7 @@ class ProviderManager {
             }
             
             // Show AUTO ROUTER first (highly recommended)
-            echo Utils::colorize("[bold][cyan]━━━ 🤖 AUTO MODEL SELECTION (RECOMMENDED) ━━━[/cyan][/bold]\n");
+            echo Utils::colorize("[bold][cyan]━━━ 🤖 AUTO MODEL SELECTION (RECOMMENDED EXPENSIVE) ━━━[/cyan][/bold]\n");
             echo Utils::colorize("[dim]Let OpenRouter automatically choose the best model for each prompt![/dim]\n\n");
             $model_index = 1;
             $model_map = [];
@@ -557,6 +557,222 @@ class ProviderManager {
         echo Utils::colorize("\n[bold][green]✓ Configuration saved successfully![/green][/bold]\n");
         echo Utils::colorize("[dim]You can change these settings anytime by running the game with --setup flag[/dim]\n\n");
     }
+    
+    /**
+     * Interactive model selection only (keeps existing API key)
+     */
+    public function selectModel() {
+        echo Utils::colorize("\n[bold][cyan]═══════════════════════════════════════════════════════[/cyan][/bold]\n");
+        echo Utils::colorize("[bold][yellow]        Change AI Model[/yellow][/bold]\n");
+        echo Utils::colorize("[bold][cyan]═══════════════════════════════════════════════════════[/cyan][/bold]\n\n");
+        
+        $provider_config = $this->config['providers'][$this->provider];
+        
+        echo Utils::colorize("[dim]Current model: " . $this->model . "[/dim]\n\n");
+        
+        // Fetch dynamic model list for OpenRouter
+        $all_models = $this->fetchOpenRouterModels();
+        $models = array_keys($all_models);
+        
+        // Use fetched models instead of static config
+        $provider_config['models'] = $all_models;
+        // Organize models for better display - priority providers shown first
+        $priority_providers = ['openai', 'anthropic', 'google', 'meta-llama', 'mistralai', 'x-ai', 'deepseek'];
+        
+        // Dynamically extract FREE models (all models here already support tools)
+        $free_models = [];
+        $paid_models = [];
+        foreach ($all_models as $model_id => $model_name) {
+            if (strpos($model_name, '🆓 FREE') !== false || strpos($model_id, ':free') !== false) {
+                $free_models[$model_id] = $model_name;
+            } else {
+                $paid_models[$model_id] = $model_name;
+            }
+        }
+        
+        // Show AUTO ROUTER first (highly recommended)
+        echo Utils::colorize("[bold][cyan]━━━ 🤖 AUTO MODEL SELECTION ━━━[/cyan][/bold]\n");
+        echo Utils::colorize("[dim]Let OpenRouter automatically choose the best model for each prompt![/dim]\n\n");
+        $model_index = 1;
+        $model_map = [];
+        
+        // Auto Router option
+        $auto_model = 'openrouter/auto';
+        $model_map[$model_index] = $auto_model;
+        echo Utils::colorize(sprintf(
+            "[cyan]%2d.[/cyan] [bold][magenta]⭐ %s[/magenta][/bold]\n",
+            $model_index,
+            "openrouter/auto - Auto Router (intelligently selects best model)"
+        ));
+        echo Utils::colorize("[dim]    Powered by NotDiamond - analyzes your prompt and routes to optimal model[/dim]\n");
+        echo Utils::colorize("[bold][red]⚠️  WARNING: Auto Router can be VERY EXPENSIVE![/red][/bold]\n");
+        echo Utils::colorize("[dim]    May route to premium models like Claude/GPT-4 at \$15-60+/million tokens.[/dim]\n");
+        echo Utils::colorize("[dim]    Consider a FREE model or specific paid model for predictable costs.[/dim]\n");
+        $model_index++;
+        
+        // Add to all_models so it can be displayed later
+        $all_models[$auto_model] = "🤖 Auto Router (intelligent model selection)";
+        
+        // Show FREE models
+        echo Utils::colorize("\n[bold][green]━━━ 🆓 FREE MODELS ━━━[/green][/bold]\n");
+        echo Utils::colorize("[dim]No API costs - all models shown support tool calling[/dim]\n\n");
+        
+        // Sort free models by provider priority
+        $sorted_free_models = [];
+        foreach ($priority_providers as $provider) {
+            foreach ($free_models as $model_id => $model_name) {
+                if (strpos($model_id, $provider . '/') === 0) {
+                    $sorted_free_models[$model_id] = $model_name;
+                }
+            }
+        }
+        foreach ($free_models as $model_id => $model_name) {
+            if (!isset($sorted_free_models[$model_id])) {
+                $sorted_free_models[$model_id] = $model_name;
+            }
+        }
+        
+        // Show first 10 free models
+        $free_shown = 0;
+        foreach ($sorted_free_models as $model_id => $model_name) {
+            if ($free_shown < 10) {
+                $model_map[$model_index] = $model_id;
+                echo Utils::colorize(sprintf(
+                    "[cyan]%2d.[/cyan] [green]%s[/green]\n",
+                    $model_index,
+                    $model_id . " - " . $model_name
+                ));
+                $model_index++;
+                $free_shown++;
+            }
+        }
+        
+        if (count($sorted_free_models) > 10) {
+            echo Utils::colorize("[dim]    ... and " . (count($sorted_free_models) - 10) . " more free models[/dim]\n");
+        }
+        
+        // Show PAID models
+        echo Utils::colorize("\n[bold][yellow]━━━ 💰 PAID MODELS ━━━[/yellow][/bold]\n");
+        echo Utils::colorize("[dim]Premium models with higher capabilities[/dim]\n\n");
+        
+        // Sort paid models by provider priority
+        $sorted_paid_models = [];
+        foreach ($priority_providers as $provider) {
+            foreach ($paid_models as $model_id => $model_name) {
+                if (strpos($model_id, $provider . '/') === 0) {
+                    $sorted_paid_models[$model_id] = $model_name;
+                }
+            }
+        }
+        foreach ($paid_models as $model_id => $model_name) {
+            if (!isset($sorted_paid_models[$model_id])) {
+                $sorted_paid_models[$model_id] = $model_name;
+            }
+        }
+        
+        // Show first 15 paid models
+        $paid_shown = 0;
+        foreach ($sorted_paid_models as $model_id => $model_name) {
+            if ($paid_shown < 15) {
+                $model_map[$model_index] = $model_id;
+                echo Utils::colorize(sprintf(
+                    "[cyan]%2d.[/cyan] [yellow]%s[/yellow]\n",
+                    $model_index,
+                    $model_id . " - " . $model_name
+                ));
+                $model_index++;
+                $paid_shown++;
+            }
+        }
+        
+        if (count($sorted_paid_models) > 15) {
+            echo Utils::colorize("[dim]    ... and " . (count($sorted_paid_models) - 15) . " more paid models[/dim]\n");
+        }
+        
+        echo Utils::colorize("\n[dim]Enter a number, type a model name/ID, or 'search <term>' to find models[/dim]\n");
+        echo Utils::colorize("[dim]Press Enter to cancel and keep current model[/dim]\n\n");
+        
+        // Model selection loop
+        $model_choice = null;
+        while ($model_choice === null) {
+            $input = trim(readline(Utils::colorize("[cyan]Select model: [/cyan]")));
+            
+            // Allow cancellation
+            if (empty($input)) {
+                echo Utils::colorize("\n[yellow]Keeping current model: " . $this->model . "[/yellow]\n");
+                return false;
+            }
+            
+            $input_lower = strtolower($input);
+            
+            if (is_numeric($input) && isset($model_map[(int)$input])) {
+                $model_choice = $model_map[(int)$input];
+            } else if (strpos($input_lower, 'search ') === 0) {
+                $search_term = trim(substr($input, 7));
+                if (!empty($search_term)) {
+                    $matches = array_filter($models, function($m) use ($search_term) {
+                        return stripos($m, $search_term) !== false;
+                    });
+                    
+                    if (empty($matches)) {
+                        echo Utils::colorize("[yellow]No models found matching '$search_term'[/yellow]\n");
+                    } else {
+                        echo Utils::colorize("\n[bold]Search results for '$search_term':[/bold]\n");
+                        $search_index = 1;
+                        $search_map = [];
+                        foreach (array_slice($matches, 0, 20) as $match) {
+                            $search_map[$search_index] = $match;
+                            $display = $all_models[$match] ?? $match;
+                            echo Utils::colorize(sprintf("[cyan]%2d.[/cyan] %s - %s\n", $search_index, $match, $display));
+                            $search_index++;
+                        }
+                        if (count($matches) > 20) {
+                            echo Utils::colorize("[dim]... and " . (count($matches) - 20) . " more matches[/dim]\n");
+                        }
+                        
+                        $sub_input = trim(readline(Utils::colorize("\n[cyan]Select from results (number) or continue: [/cyan]")));
+                        if (is_numeric($sub_input) && isset($search_map[(int)$sub_input])) {
+                            $model_choice = $search_map[(int)$sub_input];
+                        }
+                    }
+                }
+                echo "\n";
+            } else if (isset($all_models[$input_lower])) {
+                $model_choice = $input_lower;
+            } else {
+                // Try to match partial model ID
+                $matches = array_filter($models, function($m) use ($input_lower) {
+                    return strpos(strtolower($m), $input_lower) !== false;
+                });
+                
+                if (count($matches) === 1) {
+                    $model_choice = reset($matches);
+                } else if (count($matches) > 1) {
+                    echo Utils::colorize("[yellow]Multiple matches found:[/yellow]\n");
+                    foreach (array_slice($matches, 0, 10) as $match) {
+                        echo Utils::colorize("  • " . $match . "\n");
+                    }
+                    if (count($matches) > 10) {
+                        echo Utils::colorize("[dim]  ... and " . (count($matches) - 10) . " more[/dim]\n");
+                    }
+                } else {
+                    echo Utils::colorize("[red]Model not found. Please try again.[/red]\n");
+                }
+            }
+        }
+        
+        $this->model = $model_choice;
+        
+        // Get display name
+        $display_name = $all_models[$this->model] ?? $provider_config['models'][$this->model] ?? $this->model;
+        echo Utils::colorize("\n[green]Selected model: " . $display_name . "[/green]\n");
+        
+        // Save configuration
+        $this->saveProviderSettings();
+        
+        echo Utils::colorize("\n[bold][green]✓ Model changed successfully![/green][/bold]\n");
+        return true;
+T     }
     
     /**
      * Get the current provider

@@ -484,6 +484,20 @@ while (true) {
                 }
                 break;
                 
+            case 'm':
+                // Change model without changing API key
+                $model_changed = $providerManager->selectModel();
+                if ($model_changed) {
+                    // Display new model info
+                    $provider_config = $providerManager->getProviderConfig();
+                    $model_display = $providerManager->getModel();
+                    if (isset($provider_config['models'][$model_display])) {
+                        $model_display = $provider_config['models'][$model_display];
+                    }
+                    echo Utils::colorize("\n[dim]Now using: " . $model_display . "[/dim]\n");
+                }
+                continue 2;
+                
             case 'i':
                 $generate_image_toggle = !$generate_image_toggle;
                 echo Utils::colorize("\n[green]Image generation is now " . ($generate_image_toggle ? "enabled" : "disabled") . ".[/green]\n");
@@ -765,6 +779,8 @@ function displayGameMenu($generate_image_toggle, $generate_audio_toggle) {
     echo Utils::colorize("[green](q) Quit the game[/green]");
     echo " | ";
     echo Utils::colorize("[green](n) Start a new game[/green]");
+    echo " | ";
+    echo Utils::colorize("[green](m) Change model[/green]");
     echo "\n";
 }
 
