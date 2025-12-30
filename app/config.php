@@ -104,7 +104,11 @@ return [
     'image' => [
         'scale' => 4, // Scale factor for ASCII art conversion
         'max_width' => 100, // Maximum width for ASCII art
-        'max_height' => 1001, // Maximum height for ASCII art
+        'max_height' => 50, // Maximum height for ASCII art (terminal rows)
+        
+        // ASCII art rendering mode
+        // Half-block mode uses ▀▄ characters with fg/bg colors for 2x vertical resolution
+        'use_half_block' => true, // Best quality - doubles vertical resolution
         
         // Image generation service configuration
         'generation_service' => 'openrouter', // Using OpenRouter for image generation

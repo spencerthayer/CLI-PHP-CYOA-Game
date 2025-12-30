@@ -6,13 +6,21 @@ class ImageHandler {
     private $config;
     private $debug;
     private $useChunky;
+    private $useHalfBlock;
     private $api_key;
     private $use_openrouter;
     
-    public function __construct($config, $debug = false, $useChunky = false) {
+    public function __construct($config, $debug = false, $useChunky = false, $useHalfBlock = null) {
         $this->config = $config;
         $this->debug = $debug;
         $this->useChunky = $useChunky;
+        
+        // Half-block mode: use config default if not explicitly set
+        if ($useHalfBlock === null) {
+            $this->useHalfBlock = $config['image']['use_half_block'] ?? true;
+        } else {
+            $this->useHalfBlock = $useHalfBlock;
+        }
         
         // Check config for OpenRouter image generation
         $this->use_openrouter = ($config['image']['generation_service'] === 'openrouter') &&
@@ -348,14 +356,19 @@ class ImageHandler {
 
         if ($this->debug) {
             echo "[DEBUG] Generating ASCII art from image at: $image_path\n";
-            if ($this->useChunky) {
+            if ($this->useHalfBlock) {
+                echo "[DEBUG] Using Half-Block ASCII converter (2x vertical resolution)\n";
+            } elseif ($this->useChunky) {
                 echo "[DEBUG] Using Chunky ASCII converter\n";
             } else {
                 echo "[DEBUG] Using standard ASCII converter\n";
             }
         }
         
-        if ($this->useChunky) {
+        // Priority: Half-Block > Chunky > Standard
+        if ($this->useHalfBlock) {
+            $converter = new HalfBlockAsciiConverter($this->config);
+        } elseif ($this->useChunky) {
             $converter = new ChunkyAsciiArtConverter($this->config, 8, true, true);
         } else {
             $converter = new AsciiArtConverter($this->config);
