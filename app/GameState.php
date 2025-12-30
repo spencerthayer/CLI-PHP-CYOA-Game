@@ -163,8 +163,8 @@ class GameState {
                     $args = json_decode($args, true);
                 }
                 if (is_array($args) && isset($args['narrative'])) {
-                    // Return the narrative so the AI knows what happened in the story
-                    return "[STORY CONTEXT: " . $args['narrative'] . "]";
+                    // Return the clean narrative so the AI knows what happened in the story
+                    return $args['narrative'];
                 }
             }
         }

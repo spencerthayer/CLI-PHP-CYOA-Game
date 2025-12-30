@@ -31,10 +31,17 @@ class ApiHandler {
                 continue;
             }
             
-            // For assistant messages with tool_calls but empty/placeholder content
-            if ($role === 'assistant' && isset($message['tool_calls'])) {
-                // Extract narrative from tool_calls if content is empty or just a context marker
-                if (empty($content) || strpos($content, '[STORY CONTEXT:') === 0) {
+            // For assistant messages, ensure we have clean narrative content
+            if ($role === 'assistant') {
+                // Strip [STORY CONTEXT: ...] wrapper if present
+                if (strpos($content, '[STORY CONTEXT:') === 0) {
+                    // Remove the wrapper to get clean narrative
+                    $content = preg_replace('/^\[STORY CONTEXT:\s*/', '', $content);
+                    $content = preg_replace('/\]$/', '', $content);
+                }
+                
+                // If content is still empty but we have tool_calls, extract narrative from them
+                if (empty(trim($content)) && isset($message['tool_calls'])) {
                     $narrative = $this->extractNarrativeFromToolCalls($message['tool_calls']);
                     if (!empty($narrative)) {
                         $content = $narrative;
@@ -43,7 +50,7 @@ class ApiHandler {
             }
             
             // Skip empty messages
-            if (empty($content)) {
+            if (empty(trim($content))) {
                 continue;
             }
             
@@ -56,6 +63,64 @@ class ApiHandler {
         }
         
         return $sanitized;
+    }
+    
+    /**
+     * Build a story summary from the conversation to help maintain continuity
+     */
+    private function buildStorySummary($conversation) {
+        if (empty($conversation)) {
+            return "";
+        }
+        
+        // Extract the last few exchanges for context
+        $recent_messages = array_slice($conversation, -6); // Last 3 exchanges (user + assistant)
+        
+        $summary = "=== STORY SO FAR ===\n";
+        
+        // Find the last assistant message to get current scene
+        $last_scene = null;
+        $last_player_action = null;
+        
+        for ($i = count($conversation) - 1; $i >= 0; $i--) {
+            $msg = $conversation[$i];
+            if ($msg['role'] === 'assistant' && !$last_scene) {
+                // Get first 300 chars of the narrative as the current scene
+                $last_scene = substr($msg['content'], 0, 300);
+                if (strlen($msg['content']) > 300) {
+                    $last_scene .= '...';
+                }
+            } else if ($msg['role'] === 'user' && !$last_player_action && $msg['content'] !== 'start game') {
+                $last_player_action = $msg['content'];
+            }
+            
+            if ($last_scene && $last_player_action) {
+                break;
+            }
+        }
+        
+        if ($last_scene) {
+            $summary .= "CURRENT SCENE: " . $last_scene . "\n\n";
+        }
+        
+        if ($last_player_action) {
+            $summary .= "PLAYER'S LAST ACTION: " . $last_player_action . "\n";
+            $summary .= ">>> YOU MUST describe what happens as a DIRECT RESULT of this action! <<<\n\n";
+        }
+        
+        // Count total exchanges to give sense of story length
+        $exchange_count = 0;
+        foreach ($conversation as $msg) {
+            if ($msg['role'] === 'user' && $msg['content'] !== 'start game') {
+                $exchange_count++;
+            }
+        }
+        
+        if ($exchange_count > 0) {
+            $summary .= "Story progress: " . $exchange_count . " player actions taken so far.\n\n";
+        }
+        
+        return $summary;
     }
     
     /**
@@ -694,21 +759,38 @@ class ApiHandler {
         // Some models don't properly read tool_calls in conversation history
         $updated_conversation = $this->sanitizeConversationForApi($raw_conversation);
         
+        // Build the story continuity context from the conversation
+        $story_summary = $this->buildStorySummary($updated_conversation);
+        
         $data = [
             'model' => $this->provider_manager->getModel(),
             'messages' => array_merge(
                 [
                     [
                         'role' => 'system',
-                        'content' => "You are narrating a dark fantasy RPG game. Provide immersive narrative descriptions but DO NOT include the options list in the narrative - options will be displayed separately.\n\n" .
+                        'content' => "You are narrating a dark fantasy RPG game called 'The Dying Earth'. " .
+                            "You MUST maintain story continuity - each response must directly continue from where the story left off.\n\n" .
+                            
+                            "=== CRITICAL STORY CONTINUITY RULES ===\n" .
+                            "1. READ THE CONVERSATION HISTORY CAREFULLY - it contains the story so far\n" .
+                            "2. Your narrative MUST be a DIRECT RESPONSE to the player's last action\n" .
+                            "3. NEVER start a completely new scene - always continue from the current location/situation\n" .
+                            "4. Reference what happened before - characters met, items found, places visited\n" .
+                            "5. If the player chose an action, describe the RESULT of that action\n\n" .
+                            
+                            $story_summary .
+                            
+                            "=== RESPONSE FORMAT ===\n" .
+                            "Provide immersive narrative descriptions. DO NOT include the options list in the narrative - options will be displayed separately.\n\n" .
+                            
                             "FORMAT FOR OPTIONS:\n" .
                             "- Each option must be an object with 'emoji', 'text', and 'skill_check' fields\n" .
                             "- emoji: A single emoji representing the action (e.g., '🔍', '⚔️', '🌿')\n" .
                             "- text: The action description WITHOUT emoji, numbers, or skill check\n" .
-                            "- skill_check: The check in format [Attribute DC:XX] where DC is between " . $this->config['difficulty_range']['min'] . " and " . $this->config['difficulty_range']['max'] . "\n\n" .
-                            "DO NOT include numbers in your options - numbering is handled by the game.\n\n" .
-                            "IMPORTANT: Build upon the previous narrative and skill check results. When a skill check fails, provide alternative paths or consequences, not the same challenge again. Progress the story based on successes and failures." .
-                            "\n\nThe player's current stats are:\n" .
+                            "- skill_check: The check in format [Attribute DC:XX] where DC is between " . $this->config['difficulty_range']['min'] . " and " . $this->config['difficulty_range']['max'] . "\n" .
+                            "- DO NOT include numbers - numbering is handled by the game\n\n" .
+                            
+                            "=== PLAYER STATS ===\n" .
                             "Primary Attributes:\n" .
                             $formattedStats .
                             "Derived Stats:\n" .
@@ -716,8 +798,7 @@ class ApiHandler {
                             "Focus: " . $stats->getStat('Focus')['current'] . "/" . $stats->getStat('Focus')['max'] . "\n" .
                             "Stamina: " . $stats->getStat('Stamina')['current'] . "/" . $stats->getStat('Stamina')['max'] . "\n" .
                             "Sanity: " . $stats->getStat('Sanity')['current'] . "/" . $stats->getStat('Sanity')['max'] . "\n" .
-                            "\nLevel: " . $stats->getLevel() . "\n" .
-                            "Experience: " . $stats->getExperience() . "\n"
+                            "Level: " . $stats->getLevel() . " | Experience: " . $stats->getExperience() . "\n"
                     ]
                 ],
                 $updated_conversation
