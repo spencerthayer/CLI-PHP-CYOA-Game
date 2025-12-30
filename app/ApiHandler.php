@@ -123,6 +123,9 @@ class ApiHandler {
     /**
      * Inject story context directly into the last user message
      * This ensures the AI sees the context even if it ignores conversation history
+     * 
+     * IMPORTANT: We now REPLACE the entire conversation with just the context-injected message
+     * to prevent the model from getting confused by old messages
      */
     private function injectStoryContext($conversation) {
         if (count($conversation) < 2) {
@@ -161,50 +164,59 @@ class ApiHandler {
                 return $conversation;
             }
             
-            // Build a comprehensive context injection
+            // Build a SINGLE comprehensive message that contains ALL context
+            // This replaces the entire conversation to prevent model confusion
             $context_parts = [];
-            $context_parts[] = "═══════════════════════════════════════════════════════════════";
-            $context_parts[] = "CRITICAL: YOU ARE CONTINUING AN EXISTING STORY - NOT STARTING NEW";
-            $context_parts[] = "═══════════════════════════════════════════════════════════════";
+            $context_parts[] = "╔════════════════════════════════════════════════════════════════════════════╗";
+            $context_parts[] = "║  MANDATORY STORY CONTINUATION - DO NOT IGNORE THIS CONTEXT                ║";
+            $context_parts[] = "╚════════════════════════════════════════════════════════════════════════════╝";
             $context_parts[] = "";
-            $context_parts[] = "THE CURRENT SCENE (where the player is NOW):";
-            $context_parts[] = "---";
+            $context_parts[] = "You are continuing an EXISTING story. The player is currently in this scene:";
+            $context_parts[] = "";
+            $context_parts[] = "▼▼▼ CURRENT SCENE START ▼▼▼";
             $context_parts[] = $previous_scene;
-            $context_parts[] = "---";
+            $context_parts[] = "▲▲▲ CURRENT SCENE END ▲▲▲";
             $context_parts[] = "";
             
             // Add skill check result if present
             if ($skill_check_context) {
-                $context_parts[] = "SKILL CHECK OUTCOME:";
-                $context_parts[] = $skill_check_context;
+                $context_parts[] = "★ SKILL CHECK RESULT: " . $skill_check_context;
                 $context_parts[] = "";
             }
             
-            $context_parts[] = "THE PLAYER'S CHOSEN ACTION: " . $user_action;
+            $context_parts[] = "▶ PLAYER'S CHOSEN ACTION: " . $user_action;
             $context_parts[] = "";
-            $context_parts[] = "YOUR TASK: Describe what happens NEXT in THIS scene when the player";
-            $context_parts[] = "performs this action. Stay in the SAME location with the SAME characters.";
-            $context_parts[] = "DO NOT teleport to a new location. DO NOT introduce unrelated scenarios.";
-            $context_parts[] = "═══════════════════════════════════════════════════════════════";
+            $context_parts[] = "╔════════════════════════════════════════════════════════════════════════════╗";
+            $context_parts[] = "║  YOUR RESPONSE MUST:                                                       ║";
+            $context_parts[] = "║  1. Continue from the EXACT scene described above                         ║";
+            $context_parts[] = "║  2. Describe the DIRECT result of the player's action                     ║";
+            $context_parts[] = "║  3. Stay in the SAME location (do NOT teleport elsewhere)                 ║";
+            $context_parts[] = "║  4. Keep the SAME characters/situation (do NOT introduce new scenarios)   ║";
+            $context_parts[] = "╚════════════════════════════════════════════════════════════════════════════╝";
+            $context_parts[] = "";
+            $context_parts[] = "FORBIDDEN: Starting a new story, changing locations arbitrarily, ignoring the scene above.";
             
             $enhanced_message = implode("\n", $context_parts);
             
-            $conversation[$last_user_idx]['content'] = $enhanced_message;
-            
-            // Remove the skill check context message if it exists (it's now in the enhanced message)
-            if ($skill_check_context) {
-                $conversation = array_values(array_filter($conversation, function($msg) {
-                    return strpos($msg['content'], '[SKILL CHECK RESULT:') === false;
-                }));
-            }
+            // CRITICAL: Return ONLY the enhanced message, discarding old conversation history
+            // This prevents the model from being distracted by previous messages
+            $result = [
+                [
+                    'role' => 'user',
+                    'content' => $enhanced_message
+                ]
+            ];
             
             if ($this->debug) {
-                write_debug_log("Injected story context into user message", [
+                write_debug_log("Injected story context - REPLACED conversation with single message", [
                     'previous_scene_length' => strlen($previous_scene),
                     'user_action' => $user_action,
-                    'has_skill_check' => !is_null($skill_check_context)
+                    'has_skill_check' => !is_null($skill_check_context),
+                    'final_message_length' => strlen($enhanced_message)
                 ]);
             }
+            
+            return $result;
         }
         
         return $conversation;
@@ -850,22 +862,22 @@ class ApiHandler {
         // This forces the AI to see the previous scene context even if it ignores conversation history
         $updated_conversation = $this->injectStoryContext($updated_conversation);
         
-        // Build the system prompt - keep it focused on format, not story (story context is in user messages)
+        // Build the system prompt - VERY strict about context following
         $system_prompt = "You are the narrator for 'The Dying Earth', a dark fantasy RPG.\n\n" .
-            "CRITICAL RULES:\n" .
-            "1. The user's message contains the CURRENT SCENE and their CHOSEN ACTION\n" .
-            "2. Your narrative MUST describe what happens when they perform that action IN THAT SCENE\n" .
-            "3. NEVER ignore the scene context - stay in the same location with the same characters\n" .
-            "4. If a SKILL CHECK is mentioned, follow its SUCCESS/FAILURE outcome\n\n" .
+            "ABSOLUTE RULES - VIOLATION MEANS FAILURE:\n" .
+            "1. The user message contains a SCENE and an ACTION. You MUST continue from that EXACT scene.\n" .
+            "2. Your narrative describes what happens when the player does that action IN THAT LOCATION.\n" .
+            "3. NEVER start a new story. NEVER teleport to a different location. NEVER ignore the context.\n" .
+            "4. If the scene mentions a tavern, YOU ARE IN A TAVERN. If it mentions a tower, YOU ARE IN A TOWER.\n" .
+            "5. If a SKILL CHECK result is provided, your narrative MUST reflect that outcome.\n\n" .
             
-            "RESPONSE FORMAT:\n" .
-            "- narrative: Describe what happens (2-4 paragraphs)\n" .
-            "- options: Exactly 4 choices, each with emoji, text, and skill_check [Attribute DC:X]\n" .
-            "- image: A short prompt for scene visualization\n\n" .
+            "RESPONSE FORMAT (use GameResponse tool):\n" .
+            "- narrative: 2-4 paragraphs continuing the SAME scene\n" .
+            "- options: 4 choices with emoji, text, skill_check [Attribute DC:X]\n" .
+            "- image: Short prompt for scene visualization\n\n" .
             
-            "PLAYER STATS:\n" . $formattedStats .
-            "Health: " . $stats->getStat('Health')['current'] . "/" . $stats->getStat('Health')['max'] . " | " .
-            "Sanity: " . $stats->getStat('Sanity')['current'] . "/" . $stats->getStat('Sanity')['max'] . "\n";
+            "PLAYER: Health " . $stats->getStat('Health')['current'] . "/" . $stats->getStat('Health')['max'] . 
+            " | Sanity " . $stats->getStat('Sanity')['current'] . "/" . $stats->getStat('Sanity')['max'] . "\n";
         
         if ($this->debug) {
             write_debug_log("Sending to API", [
