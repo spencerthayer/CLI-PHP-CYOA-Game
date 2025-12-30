@@ -68,7 +68,13 @@ class ProviderManager {
     }
     
     /**
+     * Full model data cache for filtering and display
+     */
+    private $full_model_data = [];
+    
+    /**
      * Fetch models from OpenRouter API
+     * Filters to only include models that support tool calling (required for this game)
      */
     private function fetchOpenRouterModels() {
         $cache_file = __DIR__ . '/openrouter_models_cache.json';
@@ -78,6 +84,7 @@ class ProviderManager {
         if (file_exists($cache_file)) {
             $cache_data = json_decode(file_get_contents($cache_file), true);
             if (isset($cache_data['timestamp']) && (time() - $cache_data['timestamp'] < $cache_duration)) {
+                $this->full_model_data = $cache_data['full_data'] ?? [];
                 return $cache_data['models'];
             }
         }
@@ -88,7 +95,7 @@ class ProviderManager {
         $ch = curl_init('https://openrouter.ai/api/v1/models');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
         
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -98,63 +105,64 @@ class ProviderManager {
             $data = json_decode($response, true);
             if (isset($data['data'])) {
                 $models = [];
+                $full_data = [];
                 
                 // Process and organize models
                 foreach ($data['data'] as $model) {
                     $id = $model['id'];
                     $name = $model['name'] ?? $id;
                     
-                    // Add context information
+                    // Check if model supports tool calling (REQUIRED for this game)
+                    $supports_tools = false;
+                    if (isset($model['supported_parameters']) && is_array($model['supported_parameters'])) {
+                        $supports_tools = in_array('tools', $model['supported_parameters']);
+                    }
+                    
+                    // Skip models that don't support tool calling (except free models which we'll note)
+                    $is_free = (isset($model['pricing']) && ($model['pricing']['prompt'] ?? 1) == 0) || strpos($id, ':free') !== false;
+                    
+                    // Store full data for all models
+                    $full_data[$id] = [
+                        'name' => $name,
+                        'supports_tools' => $supports_tools,
+                        'is_free' => $is_free,
+                        'pricing' => $model['pricing'] ?? null,
+                        'context_length' => $model['context_length'] ?? null,
+                        'modality' => $model['architecture']['modality'] ?? null,
+                    ];
+                    
+                    // Only include models that support tools (or are free - let user try)
+                    if (!$supports_tools && !$is_free) {
+                        continue;
+                    }
+                    
+                    // Build display name with pricing info
                     $info = [];
                     
+                    // Add pricing info
+                    if ($is_free) {
+                        $info[] = "🆓 FREE";
+                    } else if (isset($model['pricing'])) {
+                        $input_price = ($model['pricing']['prompt'] ?? 0) * 1000000;
+                        $output_price = ($model['pricing']['completion'] ?? 0) * 1000000;
+                        
+                        // Format price per million tokens
+                        if ($input_price > 0 || $output_price > 0) {
+                            $info[] = sprintf("\$%.2f/\$%.2f per 1M", $input_price, $output_price);
+                        }
+                    }
+                    
+                    // Add context length for large context models
                     if (isset($model['context_length'])) {
                         $context = $model['context_length'];
-                        if ($context >= 128000) {
+                        if ($context >= 100000) {
                             $info[] = round($context / 1000) . "k ctx";
                         }
                     }
                     
-                    $is_free = false;
-                    if (isset($model['pricing'])) {
-                        $input_price = ($model['pricing']['prompt'] ?? 0) * 1000000;
-                        if ($input_price == 0) {
-                            $info[] = "🆓 FREE";
-                            $is_free = true;
-                        } else if ($input_price < 0.5) {
-                            $info[] = "$";
-                        } else if ($input_price < 2) {
-                            $info[] = "$$";
-                        } else {
-                            $info[] = "$$$";
-                        }
-                    }
-                    
-                    // Check if model ID contains ":free" suffix
-                    if (strpos($id, ':free') !== false) {
-                        if (!$is_free) {
-                            $info[] = "🆓 FREE";
-                        }
-                    }
-                    
-                    // Check capabilities
-                    if (isset($model['architecture']['modality'])) {
-                        $modality = $model['architecture']['modality'];
-                        // Handle both string and array formats
-                        if (is_string($modality)) {
-                            if (strpos($modality, 'image') !== false || strpos($modality, 'vision') !== false) {
-                                $info[] = "Vision";
-                            }
-                            if (strpos($modality, 'audio') !== false || strpos($modality, 'speech') !== false) {
-                                $info[] = "Audio";
-                            }
-                        } else if (is_array($modality)) {
-                            if (in_array('image', $modality)) {
-                                $info[] = "Vision";
-                            }
-                            if (in_array('audio', $modality)) {
-                                $info[] = "Audio";
-                            }
-                        }
+                    // Note if doesn't support tools
+                    if (!$supports_tools) {
+                        $info[] = "⚠️ No tools";
                     }
                     
                     $display_name = $name;
@@ -168,10 +176,12 @@ class ProviderManager {
                 // Cache the results
                 $cache_data = [
                     'timestamp' => time(),
-                    'models' => $models
+                    'models' => $models,
+                    'full_data' => $full_data
                 ];
                 file_put_contents($cache_file, json_encode($cache_data));
                 
+                $this->full_model_data = $full_data;
                 return $models;
             }
         }
@@ -179,6 +189,27 @@ class ProviderManager {
         // Fallback to default models if API fails
         echo Utils::colorize("[yellow]Could not fetch latest models, using default list.[/yellow]\n");
         return $this->config['providers']['openrouter']['models'];
+    }
+    
+    /**
+     * Get full model data for a specific model
+     */
+    public function getModelData($model_id) {
+        return $this->full_model_data[$model_id] ?? null;
+    }
+    
+    /**
+     * Get all models for a specific provider (unfiltered)
+     */
+    public function getAllModelsForProvider($provider_name) {
+        $provider_models = [];
+        foreach ($this->full_model_data as $id => $data) {
+            $parts = explode('/', $id);
+            if ($parts[0] === $provider_name) {
+                $provider_models[$id] = $data;
+            }
+        }
+        return $provider_models;
     }
     
     /**
@@ -314,8 +345,9 @@ class ProviderManager {
                 }
             }
             
-            echo Utils::colorize("\n[yellow]━━━ All Models by Provider ━━━[/yellow]\n");
-            echo Utils::colorize("[dim](Showing first 5 per provider, type 'more' to see all, 'free' to see all free models)[/dim]\n\n");
+            echo Utils::colorize("\n[yellow]━━━ All Models by Provider (Tool-Calling Compatible) ━━━[/yellow]\n");
+            echo Utils::colorize("[dim]Only showing models that support tool calling (required for this game)[/dim]\n");
+            echo Utils::colorize("[dim]Commands: 'more' = all models, 'free' = free models, 'all PROVIDER' = all from provider[/dim]\n\n");
             
             // Group remaining models
             $grouped_models = [];
@@ -330,10 +362,15 @@ class ProviderManager {
                 }
             }
             
+            // Track providers for "all PROVIDER" command
+            $available_providers = [];
+            
             // Show priority providers first
             foreach ($priority_providers as $provider_name) {
                 if (isset($grouped_models[$provider_name]) && !empty($grouped_models[$provider_name])) {
-                    echo Utils::colorize("[yellow]── " . ucfirst(str_replace('-', ' ', $provider_name)) . " ──[/yellow]\n");
+                    $available_providers[] = $provider_name;
+                    $total_for_provider = count($grouped_models[$provider_name]);
+                    echo Utils::colorize("[yellow]── " . ucfirst(str_replace('-', ' ', $provider_name)) . " (" . $total_for_provider . " models) ──[/yellow]\n");
                     $shown = 0;
                     foreach ($grouped_models[$provider_name] as $model) {
                         if ($shown < 5) {
@@ -347,8 +384,8 @@ class ProviderManager {
                             $shown++;
                         }
                     }
-                    if (count($grouped_models[$provider_name]) > 5) {
-                        echo Utils::colorize("[dim]     ... and " . (count($grouped_models[$provider_name]) - 5) . " more[/dim]\n");
+                    if ($total_for_provider > 5) {
+                        echo Utils::colorize("[dim]     ... and " . ($total_for_provider - 5) . " more (type 'all " . $provider_name . "' to see all)[/dim]\n");
                     }
                     echo "\n";
                 }
@@ -356,7 +393,8 @@ class ProviderManager {
             
             $model_choice = null;
             while ($model_choice === null) {
-                $input = readline(Utils::colorize("[cyan]Enter your choice (1-" . ($model_index - 1) . ") or model ID: [/cyan]"));
+                echo Utils::colorize("\n[bold]Options:[/bold] number, model ID, 'more', 'free', or 'all PROVIDER' (e.g. 'all google')\n");
+                $input = readline(Utils::colorize("[cyan]Your choice: [/cyan]"));
                 
                 // Check if it's a number
                 if (is_numeric($input)) {
@@ -416,6 +454,41 @@ class ProviderManager {
                             }
                         }
                         echo Utils::colorize("\n[green]Total free models: " . $free_count . "[/green]\n\n");
+                    } else if (strpos($input_lower, 'all ') === 0) {
+                        // Show all models for a specific provider
+                        $provider_filter = trim(substr($input_lower, 4));
+                        echo Utils::colorize("\n[yellow]━━━ All " . ucfirst($provider_filter) . " Models ━━━[/yellow]\n");
+                        $found_count = 0;
+                        foreach ($models as $model) {
+                            $parts = explode('/', $model);
+                            if (strtolower($parts[0]) === $provider_filter) {
+                                $model_map[$model_index] = $model;
+                                $display_name = $all_models[$model];
+                                // Highlight free models
+                                if (strpos($display_name, '🆓 FREE') !== false) {
+                                    echo Utils::colorize(sprintf(
+                                        "[cyan]%3d.[/cyan] [bold][green]%s[/green][/bold]\n",
+                                        $model_index,
+                                        $display_name
+                                    ));
+                                } else {
+                                    echo Utils::colorize(sprintf(
+                                        "[cyan]%3d.[/cyan] %s\n",
+                                        $model_index,
+                                        $display_name
+                                    ));
+                                }
+                                $model_index++;
+                                $found_count++;
+                            }
+                        }
+                        if ($found_count === 0) {
+                            echo Utils::colorize("[red]No models found for provider: " . $provider_filter . "[/red]\n");
+                            echo Utils::colorize("[dim]Available providers: openai, anthropic, google, meta-llama, mistralai, x-ai, deepseek, etc.[/dim]\n");
+                        } else {
+                            echo Utils::colorize("\n[green]Total " . $provider_filter . " models: " . $found_count . "[/green]\n");
+                        }
+                        echo "\n";
                     } else if (isset($all_models[$input_lower])) {
                         $model_choice = $input_lower;
                     } else {
