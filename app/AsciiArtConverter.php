@@ -151,7 +151,8 @@ class AsciiArtConverter {
             }
         } else {
             // For Unix-like systems
-            if (preg_match('/^(\d+)\s+(\d+)$/', trim(shell_exec('stty size 2>/dev/null')), $matches)) {
+            $stty_output = @shell_exec('stty size 2>/dev/null') ?? '';
+            if (preg_match('/^(\d+)\s+(\d+)$/', trim($stty_output), $matches)) {
                 $size['rows'] = (int)$matches[1];
                 $size['cols'] = (int)$matches[2];
             } else {

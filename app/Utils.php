@@ -75,7 +75,31 @@ class Utils {
         return implode("\n", $lines);
     }
     
+    /**
+     * Check if we're running in an interactive terminal
+     * @return bool True if interactive terminal, false otherwise
+     */
+    public static function isInteractiveTerminal() {
+        // Check if STDIN is a TTY
+        if (!defined('STDIN') || !is_resource(STDIN)) {
+            return false;
+        }
+        
+        // posix_isatty is the most reliable check
+        if (function_exists('posix_isatty')) {
+            return posix_isatty(STDIN) && posix_isatty(STDOUT);
+        }
+        
+        // Fallback: check if /dev/tty is available
+        return @is_readable('/dev/tty');
+    }
+    
     public static function showLoadingAnimation($context = null, $customMessage = null) {
+        // Skip spinner if not in an interactive terminal
+        if (!self::isInteractiveTerminal()) {
+            return null;
+        }
+        
         // Determine the message based on context or use custom
         if ($customMessage) {
             $message = $customMessage;
@@ -94,9 +118,9 @@ class Utils {
     }
     
     public static function stopLoadingAnimation($pid) {
-        if ($pid) {
+        if ($pid && $pid > 0) {
             // Kill the spinner process
-            posix_kill($pid, SIGTERM);
+            @posix_kill($pid, SIGTERM);
             echo "\r" . str_repeat(" ", 50) . "\r";
         }
     }
@@ -109,9 +133,15 @@ class Utils {
      * @return bool true if completed, false if cancelled
      */
     public static function runWithSpinnerAndCancellation(callable $operation, $context = null, $cancelFlag = null) {
+        // If not in an interactive terminal, just run the operation directly
+        if (!self::isInteractiveTerminal()) {
+            $result = $operation();
+            return $result !== false;
+        }
+        
         $spinner_pid = self::showLoadingAnimation($context);
-        $sttySettings = shell_exec('stty -g');
-        shell_exec('stty -icanon -echo');
+        $sttySettings = @shell_exec('stty -g 2>/dev/null');
+        @shell_exec('stty -icanon -echo 2>/dev/null');
         stream_set_blocking(STDIN, false);
         $cancelled = false;
         try {
@@ -119,9 +149,11 @@ class Utils {
             $result = null;
             while (!$work_done) {
                 // Check for 'x' keypress
-                $input = fread(STDIN, 1);
+                $input = @fread(STDIN, 1);
                 if ($input !== false && strtolower($input) === 'x') {
-                    posix_kill($spinner_pid, SIGTERM);
+                    if ($spinner_pid) {
+                        posix_kill($spinner_pid, SIGTERM);
+                    }
                     echo "\nGeneration cancelled by user.\n";
                     $cancelled = true;
                     if ($cancelFlag) {
@@ -139,9 +171,9 @@ class Utils {
             }
         } finally {
             if (!empty($sttySettings)) {
-                shell_exec('stty ' . $sttySettings);
+                @shell_exec('stty ' . $sttySettings . ' 2>/dev/null');
             } else {
-                shell_exec('stty sane');
+                @shell_exec('stty sane 2>/dev/null');
             }
             stream_set_blocking(STDIN, true);
             self::stopLoadingAnimation($spinner_pid);

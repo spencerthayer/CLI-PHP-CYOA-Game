@@ -14,52 +14,24 @@ class ImageHandler {
         $this->debug = $debug;
         $this->useChunky = $useChunky;
         
-        // Check config for OpenRouter image generation preference
-        $this->use_openrouter = ($config['image']['generation_service'] === 'openrouter' || 
-                                 $config['image']['generation_service'] === 'both') &&
+        // Check config for OpenRouter image generation
+        $this->use_openrouter = ($config['image']['generation_service'] === 'openrouter') &&
                                  ($config['image']['openrouter']['enabled'] ?? false);
         
-        // Load API key for OpenRouter if enabled
-        if ($this->use_openrouter) {
-            $api_key_file = '.data/.api_key';
-            if (file_exists($api_key_file)) {
-                $this->api_key = trim(file_get_contents($api_key_file));
-            } else {
-                $this->use_openrouter = false; // Disable if no API key
-                if ($this->debug) {
-                    echo "[DEBUG] OpenRouter image generation disabled - no API key found\n";
-                }
+        // Load API key for OpenRouter
+        $api_key_file = __DIR__ . '/../.data/.api_key';
+        if (file_exists($api_key_file)) {
+            $this->api_key = trim(file_get_contents($api_key_file));
+        } else {
+            $this->use_openrouter = false;
+            if ($this->debug) {
+                echo "[DEBUG] OpenRouter image generation disabled - no API key found\n";
             }
         }
     }
     
     /**
-     * Build a standardized URL for Pollinations.ai image generation
-     * 
-     * @param string $prompt The image generation prompt
-     * @param int $timestamp Timestamp used as seed
-     * @param int $width Image width (default: 640 for 16:9)
-     * @param int $height Image height (default: 360 for 16:9)
-     * @param string $model Model to use (default: turbo)
-     * @param string $negative_prompt Negative prompt (default: text)
-     * @return string The fully constructed URL
-     */
-    private function buildPollinationsUrl($prompt, $timestamp, $width = 640, $height = 360, $model = 'turbo', $negative_prompt = 'text') {
-        // Sanitize prompt: remove newlines before URL encoding
-        $prompt = str_replace(["\n", "\r"], ' ', $prompt);
-        $prompt_url = urlencode($prompt);
-        
-        return "https://image.pollinations.ai/prompt/$prompt_url"
-             . "?negative_prompt=$negative_prompt"
-             . "&nologo=true"
-             . "&width=$width"
-             . "&height=$height"
-             . "&seed=$timestamp"
-             . "&model=$model";
-    }
-    
-    /**
-     * Generate image using OpenRouter with Gemini 2.5 Flash Image Preview
+     * Generate image using OpenRouter API
      * 
      * @param string $prompt The image generation prompt
      * @param int $timestamp Timestamp for seeding
@@ -76,31 +48,32 @@ class ImageHandler {
         
         write_debug_log("Attempting OpenRouter image generation", ['prompt' => substr($prompt, 0, 100)]);
         
-        // Build request for Gemini 2.5 Flash Image Preview
-        $model = $this->config['image']['openrouter']['model'] ?? 'google/gemini-2.5-flash-image-preview:free';
+        // Get model from config
+        $model = $this->config['image']['openrouter']['model'] ?? 'google/gemini-2.5-flash-preview-05-20';
+        $aspect_ratio = $this->config['image']['openrouter']['aspect_ratio'] ?? '16:9';
+        $image_size = $this->config['image']['openrouter']['image_size'] ?? '1K';
         
         // Create prompt for 8-bit pixel art generation
-        // Note: Gemini through OpenRouter seems to generate square images by default
-        // We'll request widescreen but may need to crop/adjust in post-processing
-        $image_prompt = "Generate a ratio 1:1 aspect ratio 8-bit pixel art image. " .
-                       "The image must not contain any English text, unless it's part of the `Content:` prompt." .
-                       "Content: $prompt. " .
-                       "Style: retro gaming, limited color palette, nostalgic 8-bit graphics, pixelated. ";
+        $image_prompt = "Generate an 8-bit pixel art style image. " .
+                       "Do NOT include any text or words in the image. " .
+                       "Scene: $prompt. " .
+                       "Style: retro gaming, limited color palette, nostalgic 8-bit graphics, pixelated.";
         
+        // Build request per OpenRouter documentation
         $data = [
             'model' => $model,
             'messages' => [
-                [
-                    'role' => 'system',
-                    'content' => 'You are an image generation AI.'
-                ],
                 [
                     'role' => 'user',
                     'content' => $image_prompt
                 ]
             ],
-            'modalities' => ['image', 'text'],  // CRITICAL: This tells OpenRouter to generate an image!
-            'max_tokens' => 2000, // Images need more tokens (1290 per image according to docs)
+            'modalities' => ['image', 'text'],  // Required for image generation
+            'image_config' => [
+                'aspect_ratio' => $aspect_ratio,
+                'image_size' => $image_size
+            ],
+            'max_tokens' => 2000,
             'temperature' => 0.8
         ];
         
@@ -111,22 +84,34 @@ class ImageHandler {
             'X-Title: The Dying Earth CLI Game'
         ];
         
+        if ($this->debug) {
+            echo "[DEBUG] OpenRouter request model: $model\n";
+            echo "[DEBUG] OpenRouter aspect_ratio: $aspect_ratio, image_size: $image_size\n";
+        }
+        
         // Use spinner while making the API call
         $utils = new Utils();
         $response = null;
         $http_code = null;
+        $timeout = $this->config['image']['openrouter']['timeout'] ?? 60;
         
-        $api_success = $utils->runWithSpinnerAndCancellation(function() use ($data, $headers, &$response, &$http_code) {
+        $api_success = $utils->runWithSpinnerAndCancellation(function() use ($data, $headers, &$response, &$http_code, $timeout) {
             $ch = curl_init('https://openrouter.ai/api/v1/chat/completions');
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
             curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
             
             $response = curl_exec($ch);
             $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curl_error = curl_error($ch);
             curl_close($ch);
+            
+            if ($curl_error) {
+                write_debug_log("cURL error in OpenRouter request", ['error' => $curl_error]);
+            }
             
             return $response !== false;
         }, 'image');
@@ -138,146 +123,66 @@ class ImageHandler {
         
         if ($http_code !== 200) {
             write_debug_log("OpenRouter API error", ['http_code' => $http_code, 'response' => substr($response, 0, 500)]);
+            if ($this->debug) {
+                echo "[DEBUG] OpenRouter API HTTP Code: $http_code\n";
+                echo "[DEBUG] OpenRouter API Response: " . substr($response, 0, 500) . "\n";
+            }
             return false;
         }
         
         $response_data = json_decode($response, true);
         
-        // Debug: Log the actual response structure
         if ($this->debug) {
-            $debug_info = [
-                'has_choices' => isset($response_data['choices']),
-                'content_preview' => isset($response_data['choices'][0]['message']['content']) ? 
-                    substr($response_data['choices'][0]['message']['content'], 0, 200) : 'no content',
-                'has_parts' => isset($response_data['choices'][0]['message']['parts']),
-                'has_modalities' => isset($response_data['choices'][0]['message']['modalities']),
-                'has_image' => isset($response_data['choices'][0]['message']['image']),
-                'message_keys' => isset($response_data['choices'][0]['message']) ? 
-                    array_keys($response_data['choices'][0]['message']) : [],
-                'full_response' => substr(json_encode($response_data), 0, 2000)
-            ];
-            write_debug_log("OpenRouter response structure", $debug_info);
-            echo "[DEBUG] OpenRouter response keys: " . json_encode($debug_info['message_keys']) . "\n";
+            $message_keys = isset($response_data['choices'][0]['message']) ? 
+                array_keys($response_data['choices'][0]['message']) : [];
+            echo "[DEBUG] OpenRouter response keys: " . json_encode($message_keys) . "\n";
         }
         
-        // Try to extract image data from response
-        // The image might be in different formats depending on how OpenRouter returns it
+        // Extract image from OpenRouter response format
+        // Images are in: choices[0].message.images[].image_url.url as base64 data URLs
         $image_data = null;
         
-        // Check for base64 encoded image in content
-        if (isset($response_data['choices'][0]['message']['content'])) {
-            $content = $response_data['choices'][0]['message']['content'];
-            
-            // OpenRouter with modalities might return content in different formats
-            // Try to decode JSON if content looks like JSON
-            if (is_string($content) && (substr($content, 0, 1) === '{' || substr($content, 0, 1) === '[')) {
-                $content_data = @json_decode($content, true);
-                if ($content_data && isset($content_data['image'])) {
-                    $image_data = base64_decode($content_data['image']);
-                }
-            }
-            
-            // Look for base64 image data in content string
-            if (!$image_data && preg_match('/data:image\/(png|jpeg|jpg);base64,(.+)/s', $content, $matches)) {
-                $image_data = base64_decode($matches[2]);
-            } else if (!$image_data && preg_match('/^[A-Za-z0-9+\/]+=*$/s', trim($content)) && strlen($content) > 1000) {
-                // Content might be raw base64
-                $image_data = @base64_decode(trim($content), true);
-            }
-        }
-        
-        // Check for image in parts/attachments (Gemini format)
-        if (!$image_data && isset($response_data['choices'][0]['message']['parts'])) {
-            foreach ($response_data['choices'][0]['message']['parts'] as $part) {
-                if (isset($part['inline_data']['data'])) {
-                    $image_data = base64_decode($part['inline_data']['data']);
-                    break;
-                } else if (isset($part['image'])) {
-                    $image_data = base64_decode($part['image']);
-                    break;
-                }
-            }
-        }
-        
-        // Check for modalities response format
-        if (!$image_data && isset($response_data['choices'][0]['message']['modalities'])) {
-            $modalities = $response_data['choices'][0]['message']['modalities'];
-            if (isset($modalities['image'])) {
-                $image_data = base64_decode($modalities['image']);
-            }
-        }
-        
-        // Check for image directly in the message
-        if (!$image_data && isset($response_data['choices'][0]['message']['image'])) {
-            $image_data = base64_decode($response_data['choices'][0]['message']['image']);
-        }
-        
-        // Check for images array in the message (OpenRouter format with modalities)
-        if (!$image_data && isset($response_data['choices'][0]['message']['images'])) {
+        if (isset($response_data['choices'][0]['message']['images'])) {
             $images = $response_data['choices'][0]['message']['images'];
             
             if ($this->debug) {
-                write_debug_log("Found images in response", [
-                    'count' => count($images),
-                    'first_image_type' => isset($images[0]) ? gettype($images[0]) : 'none',
-                    'first_image_preview' => isset($images[0]) ? substr(json_encode($images[0]), 0, 200) : 'none'
-                ]);
+                echo "[DEBUG] Found " . count($images) . " image(s) in response\n";
             }
             
             if (is_array($images) && count($images) > 0) {
-                // Get the first image
                 $first_image = $images[0];
-                if (is_string($first_image)) {
-                    // Might be base64 encoded or a data URL
-                    if (strpos($first_image, 'data:image') === 0) {
-                        // Extract base64 from data URL
-                        preg_match('/data:image\/[^;]+;base64,(.+)/', $first_image, $matches);
-                        if (isset($matches[1])) {
-                            $image_data = base64_decode($matches[1]);
-                            if ($this->debug) {
-                                write_debug_log("Extracted image from data URL");
-                            }
-                        }
-                    } else {
-                        // Assume it's raw base64
-                        $image_data = base64_decode($first_image);
+                
+                // OpenRouter format: {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
+                if (isset($first_image['image_url']['url'])) {
+                    $url = $first_image['image_url']['url'];
+                    
+                    // Extract base64 from data URL
+                    if (preg_match('/data:image\/[^;]+;base64,(.+)/', $url, $matches)) {
+                        $image_data = base64_decode($matches[1]);
                         if ($this->debug) {
-                            write_debug_log("Decoded raw base64 image");
+                            echo "[DEBUG] Successfully extracted image from base64 data URL\n";
                         }
                     }
-                } else if (is_array($first_image)) {
-                    // Check for OpenRouter's nested image_url structure
-                    if (isset($first_image['image_url']['url'])) {
-                        $url = $first_image['image_url']['url'];
-                        if ($this->debug) {
-                            write_debug_log("Found image_url structure", ['url_preview' => substr($url, 0, 100)]);
-                        }
-                        
-                        // Check if it's a data URL with base64
-                        if (strpos($url, 'data:image') === 0) {
-                            preg_match('/data:image\/[^;]+;base64,(.+)/', $url, $matches);
-                            if (isset($matches[1])) {
-                                $image_data = base64_decode($matches[1]);
-                                if ($this->debug) {
-                                    write_debug_log("Successfully extracted image from OpenRouter image_url data URL");
-                                }
-                            }
-                        } else {
-                            // It's an external URL - download it
-                            $image_data = @file_get_contents($url);
-                        }
-                    } else if (isset($first_image['data'])) {
-                        $image_data = base64_decode($first_image['data']);
-                        if ($this->debug) {
-                            write_debug_log("Decoded image from array structure");
-                        }
-                    } else if (isset($first_image['url'])) {
-                        // Image might be a URL reference
-                        if ($this->debug) {
-                            write_debug_log("Image is URL reference", ['url' => $first_image['url']]);
-                        }
-                        // Try to download the image
-                        $image_data = @file_get_contents($first_image['url']);
+                }
+            }
+        }
+        
+        // Fallback: check other possible locations
+        if (!$image_data) {
+            // Check content for inline base64
+            if (isset($response_data['choices'][0]['message']['content'])) {
+                $content = $response_data['choices'][0]['message']['content'];
+                if (preg_match('/data:image\/[^;]+;base64,(.+)/s', $content, $matches)) {
+                    $image_data = base64_decode($matches[1]);
+                }
+            }
+            
+            // Check for parts format (Gemini)
+            if (!$image_data && isset($response_data['choices'][0]['message']['parts'])) {
+                foreach ($response_data['choices'][0]['message']['parts'] as $part) {
+                    if (isset($part['inline_data']['data'])) {
+                        $image_data = base64_decode($part['inline_data']['data']);
+                        break;
                     }
                 }
             }
@@ -285,6 +190,9 @@ class ImageHandler {
         
         if (!$image_data) {
             write_debug_log("No image data found in OpenRouter response");
+            if ($this->debug) {
+                echo "[DEBUG] No image data found in response\n";
+            }
             return false;
         }
         
@@ -303,59 +211,10 @@ class ImageHandler {
             return false;
         }
         
+        if ($this->debug) {
+            echo "[DEBUG] Image saved successfully to: $save_path\n";
+        }
         write_debug_log("OpenRouter image saved successfully", ['path' => $save_path]);
-        return true;
-    }
-    
-    /**
-     * Fetch and save an image from Pollinations.ai
-     *
-     * @param string $url The URL to fetch the image from
-     * @param string $save_path The path to save the image to
-     * @param string $context_name Context name for logging (default: 'image')
-     * @return bool True if successful, false otherwise
-     */
-    private function fetchAndSaveImage($url, $save_path, $context_name = 'image') {
-        write_debug_log("Requesting image from URL", ['url' => $url]);
-        
-        if ($this->debug) {
-            echo "[DEBUG] Requesting image from URL: $url\n";
-        }
-        
-        $image_data = null;
-        $success = false;
-        
-        // Get the image with spinner
-        $utils = new Utils();
-        $success = $utils->runWithSpinnerAndCancellation(function() use ($url, &$image_data) {
-            // Set context options for timeout
-            $context = stream_context_create(['http' => ['timeout' => 15]]);
-            // Use error suppression and check the result with context
-            $image_data = @file_get_contents($url, false, $context);
-            return $image_data !== false;
-        }, $context_name);
-        
-        if (!$success) {
-            $error = error_get_last();
-            $error_message = $error['message'] ?? 'Unknown error or cancelled';
-            write_debug_log("Failed to fetch image", ['error' => $error_message]);
-            echo $utils->colorize("[yellow]Warning: Could not download image from Pollinations.ai ($error_message).[/yellow]\n");
-            return false;
-        }
-        
-        write_debug_log("Saving image", ['path' => $save_path]);
-        
-        if (!@file_put_contents($save_path, $image_data)) {
-            write_debug_log("Failed to save image");
-            echo $utils->colorize("[yellow]Warning: Failed to save image to: {$save_path}[/yellow]\n");
-            return false;
-        }
-        
-        write_debug_log("Image saved successfully", ['path' => $save_path]);
-        if ($this->debug) {
-            echo "[DEBUG] Image saved to: $save_path\n";
-        }
-        
         return true;
     }
     
@@ -418,23 +277,24 @@ class ImageHandler {
         $image_path = $this->getImagePathForTimestamp($timestamp);
         $success = false;
         
-        // Use OpenRouter/Google Gemini exclusively
+        // Use OpenRouter for image generation
         if ($this->use_openrouter && $this->api_key) {
             if ($this->debug) {
-                echo "[DEBUG] Using Google Gemini for image generation...\n";
+                echo "[DEBUG] Using OpenRouter for image generation...\n";
             }
             $success = $this->generateWithOpenRouter($prompt, $timestamp, $image_path);
-            
-            if (!$success) {
-                if ($this->debug) {
-                    echo "[DEBUG] Google Gemini image generation failed\n";
-                }
-                write_debug_log("Google Gemini image generation failed");
-                return null; // No fallback - Google only
-            }
         } else {
-            write_debug_log("Google Gemini not available - no API key or disabled");
-            return null; // No image generation without Google
+            if ($this->debug) {
+                echo "[DEBUG] OpenRouter not available (no API key or disabled)\n";
+            }
+            write_debug_log("OpenRouter image generation not available - no API key or disabled");
+        }
+        
+        if (!$success) {
+            write_debug_log("Image generation failed");
+            $utils = new Utils();
+            echo $utils->colorize("[dim](Image generation failed - press 'i' to toggle images off)[/dim]\n");
+            return null;
         }
         
         $ascii_art = $this->generateAsciiArt($image_path);
@@ -445,11 +305,8 @@ class ImageHandler {
             // fallback to title screen logic
             $title_image_path = $this->config['paths']['images_dir'] . "/title_screen.jpg";
             $title_prompt = $this->getTitlePrompt();
-            $width = $this->config['image']['pollinations']['width'] ?? 640;
-            $height = $this->config['image']['pollinations']['height'] ?? 360;
-            $title_url = $this->buildPollinationsUrl($title_prompt, $timestamp, $width, $height);
             
-            if ($this->fetchAndSaveImage($title_url, $title_image_path, 'title')) {
+            if ($this->generateWithOpenRouter($title_prompt, $timestamp, $title_image_path)) {
                 return $this->generateAsciiArt($title_image_path);
             }
         }
@@ -467,12 +324,8 @@ class ImageHandler {
             }
             
             $title_prompt = $this->getTitlePrompt();
-            // Use configured dimensions from config (16:9 aspect ratio)
-            $width = $this->config['image']['pollinations']['width'] ?? 640;
-            $height = $this->config['image']['pollinations']['height'] ?? 360;
-            $title_url = $this->buildPollinationsUrl($title_prompt, $timestamp, $width, $height);
             
-            if (!$this->fetchAndSaveImage($title_url, $title_image_path, 'title')) {
+            if (!$this->generateWithOpenRouter($title_prompt, $timestamp, $title_image_path)) {
                 return null;
             }
         }

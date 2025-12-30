@@ -87,7 +87,7 @@ return [
     'api' => [
         'max_tokens' => 1280,
         'temperature' => 1.0,
-        'max_image_description_length' => 64,
+        'max_image_description_length' => 256,
         'timeout' => 30, // API timeout in seconds
         'retry_attempts' => 3,
         'retry_delay' => 2, // Delay between retries in seconds
@@ -107,16 +107,16 @@ return [
         'max_height' => 1001, // Maximum height for ASCII art
         
         // Image generation service configuration
-        'generation_service' => 'openrouter', // Using Google Gemini only
-        'prefer_openrouter' => true, // Use Google Gemini exclusively
+        'generation_service' => 'openrouter', // Using OpenRouter for image generation
+        'prefer_openrouter' => true,
         
-        // OpenRouter settings - Google Gemini 2.5 Flash Image Preview
+        // OpenRouter settings - Using Gemini Flash for fastest generation
         'openrouter' => [
-            'model' => 'google/gemini-2.5-flash-image-preview:free',
+            'model' => 'google/gemini-2.5-flash-image-preview', // Fast image generation model
             'enabled' => true,
             'timeout' => 60,
-            // Note: Generates 1024x1024 square images only (1:1 aspect ratio)
-            // Cost: $0.039 per image (1290 output tokens at $30/1M tokens)
+            'aspect_ratio' => '16:9', // 1344×768 pixels
+            'image_size' => '1K',     // Standard resolution for speed
         ],
     ],
     
@@ -147,12 +147,14 @@ return [
 
         Guide the player through this layered realm with language that captures the wonder, strangeness, and cosmic horror of a world built upon forgotten epochs. Every choice should feel like a step into deeper enigmas—a path into further darkness where knowledge and power await those willing to delve into the depths of time, but not without potential peril.
 
-        Always provide **exactly four options** for the player to choose from. 
+        Always provide **exactly four UNIQUE options** for the player to choose from.
         
         CRITICAL FORMAT REQUIREMENTS:
+        - ALL FOUR OPTIONS MUST BE DIFFERENT - never repeat the same action
         - Options are returned as objects with three fields: 'emoji', 'text', and 'skill_check'
         - DO NOT include numbers - the game adds them automatically
         - DO NOT combine emoji with text - they must be separate fields
+        - Each option should offer a distinct action or approach
         
         Example option object:
         {
@@ -161,11 +163,23 @@ return [
             \"skill_check\": \"[Intellect DC:12]\"
         }
         
+        VALIDATION: Before returning options, verify:
+        - No two options have the same text (even with different skill checks)
+        - No two options describe the same action
+        - All four emojis should be different when possible
+        
         Skill check format: [Attribute DC:difficulty]
         - Attribute is one of: Agility, Appearance, Charisma, Dexterity, Endurance, Intellect, Knowledge, Luck, Perception, Spirit, Strength, Vitality, Willpower, Wisdom
         - DC (Difficulty Class) is a number between 4 and 18
         
         Generate unique, contextually appropriate actions for each scene.
+        
+        OPTION VARIETY REQUIREMENTS:
+        - Each option must represent a DIFFERENT approach or action
+        - Include varied skill checks using different attributes
+        - Mix action types: examine, move, interact, sense, communicate, etc.
+        - Vary difficulty levels across the four options
+        - NEVER duplicate an option with just different wording
         
         IMPORTANT - Action Results Must Be Specific:
         - 'Examine X' SUCCESS = Describe what is found/read/discovered on X
