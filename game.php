@@ -160,6 +160,18 @@ if (!$providerManager->isConfigured()) {
     exit(1);
 }
 
+// CRITICAL: Clear game history BEFORE creating GameState (if --new flag present)
+// This ensures the GameState doesn't load stale data from a previous session
+$starting_new_game = in_array('--new', $argv);
+if ($starting_new_game) {
+    if (file_exists($config['paths']['game_history_file'])) {
+        unlink($config['paths']['game_history_file']);
+    }
+    if (file_exists($config['paths']['debug_log_file'])) {
+        unlink($config['paths']['debug_log_file']);
+    }
+}
+
 // Initialize components
 $gameState = new GameState($config, $debug);
 write_debug_log("GameState initialized", ['config' => $config, 'debug' => $debug]);
@@ -205,20 +217,9 @@ $scene_data = null;
 $scene_already_displayed = false;
 $current_scene_timestamp = 0;  // Track the currently displayed scene timestamp
 
-// Check for new game flag
-if (in_array('--new', $argv)) {
-    // Clear game history
-    if (file_exists($config['paths']['game_history_file'])) {
-        unlink($config['paths']['game_history_file']);
-        echo "Game history cleared. Starting a new game...\n";
-    } else {
-        echo "No game history found. Starting a new game...\n";
-    }
-    
-    // Clear debug log
-    if (file_exists($config['paths']['debug_log_file'])) {
-        unlink($config['paths']['debug_log_file']);
-    }
+// Handle new game flag (file already deleted before GameState was created)
+if ($starting_new_game) {
+    echo "Game history cleared. Starting a new game...\n";
     
     // Display information about Chunky ASCII mode if it's enabled
     if ($useChunky) {
@@ -246,13 +247,11 @@ if (in_array('--new', $argv)) {
     }
     echo Utils::colorize("\n[dim]Using " . $provider_config['name'] . " - " . $model_display . "[/dim]\n");
     
-    // if (!$useChunky) {
-    //     echo Utils::colorize("\n[yellow]TIP: You can use --chunky flag for enhanced ASCII art! Restart with: php game.php --chunky[/yellow]\n\n");
-    // }
-    
     $imageHandler->clearImages();
     $audioHandler->clearAudioFiles();
-    $gameState = new GameState($config);
+    
+    // GameState is already fresh (file was deleted before constructor)
+    // Just add the initial messages
     $gameState->addMessage('system', $config['system_prompt']);
     $gameState->addMessage('user', 'start game');
     $should_make_api_call = true;
@@ -302,7 +301,7 @@ if (!empty($conversation)) {
 }
 
 // If no conversation exists or --new flag was used, start a new game
-if (empty($conversation) || in_array('--new', $argv)) {
+if (empty($conversation) || $starting_new_game) {
     write_debug_log("Starting new game");
     if (empty($conversation)) {
         $gameState->addMessage('system', $config['system_prompt']);

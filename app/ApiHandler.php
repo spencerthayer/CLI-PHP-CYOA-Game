@@ -21,11 +21,9 @@ class ApiHandler {
      */
     private function sanitizeConversationForApi($conversation) {
         $sanitized = [];
-        
+
         if ($this->debug) {
-            write_debug_log("Sanitizing conversation", [
-                'input_count' => count($conversation)
-            ]);
+            echo "[DEBUG] Sanitizing: " . count($conversation) . " messages input\n";
         }
         
         foreach ($conversation as $index => $message) {
@@ -43,10 +41,10 @@ class ApiHandler {
                         'content' => $content
                     ];
                     if ($this->debug) {
-                        write_debug_log("Kept skill check result as user context", [
-                            'content' => substr($content, 0, 100)
-                        ]);
+                        echo "[DEBUG]   KEEP [$index] system->user (skill check result)\n";
                     }
+                } else if ($this->debug) {
+                    echo "[DEBUG]   SKIP [$index] system (not skill check)\n";
                 }
                 continue;
             }
@@ -98,14 +96,16 @@ class ApiHandler {
             // Skip empty messages
             if (empty(trim($content))) {
                 if ($this->debug) {
-                    write_debug_log("Skipping empty message", [
-                        'index' => $index,
-                        'role' => $role,
-                        'has_tool_calls' => isset($message['tool_calls']),
-                        'has_function_call' => isset($message['function_call'])
-                    ]);
+                    echo "[DEBUG]   SKIP [$index] $role - empty content";
+                    if (isset($message['tool_calls'])) echo " (has tool_calls)";
+                    if (isset($message['function_call'])) echo " (has function_call)";
+                    echo "\n";
                 }
                 continue;
+            }
+            
+            if ($this->debug) {
+                echo "[DEBUG]   KEEP [$index] $role - len=" . strlen($content) . "\n";
             }
             
             // Add sanitized message with just role and content
@@ -144,21 +144,19 @@ class ApiHandler {
      */
     private function injectStoryContext($conversation) {
         if ($this->debug) {
-            write_debug_log("injectStoryContext called", [
-                'conversation_count' => count($conversation),
-                'messages' => array_map(function($m) {
-                    return [
-                        'role' => $m['role'],
-                        'content_length' => strlen($m['content'] ?? ''),
-                        'preview' => substr($m['content'] ?? '', 0, 80)
-                    ];
-                }, $conversation)
-            ]);
+            // Echo directly to terminal for visibility
+            echo "[DEBUG] injectStoryContext: " . count($conversation) . " messages received\n";
+            foreach ($conversation as $i => $m) {
+                $role = $m['role'] ?? 'unknown';
+                $len = strlen($m['content'] ?? '');
+                $preview = substr($m['content'] ?? '', 0, 60);
+                echo "[DEBUG]   [$i] $role (len=$len): " . str_replace("\n", " ", $preview) . "...\n";
+            }
         }
         
         if (count($conversation) < 2) {
             if ($this->debug) {
-                write_debug_log("injectStoryContext: Not enough messages", ['count' => count($conversation)]);
+                echo "[DEBUG] injectStoryContext: NOT ENOUGH MESSAGES (need >= 2, got " . count($conversation) . ")\n";
             }
             return $conversation;
         }
