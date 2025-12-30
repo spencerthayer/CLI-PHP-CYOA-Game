@@ -74,7 +74,7 @@ class ProviderManager {
     
     /**
      * Fetch models from OpenRouter API
-     * Filters to only include models that support tool calling (required for this game)
+     * STRICTLY filters to only include models that support tool calling (required for this game)
      */
     private function fetchOpenRouterModels() {
         $cache_file = __DIR__ . '/openrouter_models_cache.json';
@@ -106,6 +106,7 @@ class ProviderManager {
             if (isset($data['data'])) {
                 $models = [];
                 $full_data = [];
+                $skipped_no_tools = 0;
                 
                 // Process and organize models
                 foreach ($data['data'] as $model) {
@@ -118,10 +119,10 @@ class ProviderManager {
                         $supports_tools = in_array('tools', $model['supported_parameters']);
                     }
                     
-                    // Skip models that don't support tool calling (except free models which we'll note)
+                    // Determine if free
                     $is_free = (isset($model['pricing']) && ($model['pricing']['prompt'] ?? 1) == 0) || strpos($id, ':free') !== false;
                     
-                    // Store full data for all models
+                    // Store full data for ALL models (for reference)
                     $full_data[$id] = [
                         'name' => $name,
                         'supports_tools' => $supports_tools,
@@ -131,8 +132,10 @@ class ProviderManager {
                         'modality' => $model['architecture']['modality'] ?? null,
                     ];
                     
-                    // Only include models that support tools (or are free - let user try)
-                    if (!$supports_tools && !$is_free) {
+                    // STRICT: Only include models that support tool calling
+                    // This game REQUIRES tool calling - no exceptions
+                    if (!$supports_tools) {
+                        $skipped_no_tools++;
                         continue;
                     }
                     
@@ -160,11 +163,6 @@ class ProviderManager {
                         }
                     }
                     
-                    // Note if doesn't support tools
-                    if (!$supports_tools) {
-                        $info[] = "⚠️ No tools";
-                    }
-                    
                     $display_name = $name;
                     if (!empty($info)) {
                         $display_name .= " (" . implode(", ", $info) . ")";
@@ -177,11 +175,21 @@ class ProviderManager {
                 $cache_data = [
                     'timestamp' => time(),
                     'models' => $models,
-                    'full_data' => $full_data
+                    'full_data' => $full_data,
+                    'stats' => [
+                        'total_fetched' => count($data['data']),
+                        'tool_compatible' => count($models),
+                        'skipped_no_tools' => $skipped_no_tools
+                    ]
                 ];
                 file_put_contents($cache_file, json_encode($cache_data));
                 
                 $this->full_model_data = $full_data;
+                
+                if ($this->debug) {
+                    echo Utils::colorize("[dim]Found " . count($models) . " tool-compatible models (filtered " . $skipped_no_tools . " incompatible)[/dim]\n");
+                }
+                
                 return $models;
             }
         }
@@ -199,13 +207,13 @@ class ProviderManager {
     }
     
     /**
-     * Get all models for a specific provider (unfiltered)
+     * Get all models for a specific provider (only tool-compatible)
      */
     public function getAllModelsForProvider($provider_name) {
         $provider_models = [];
         foreach ($this->full_model_data as $id => $data) {
             $parts = explode('/', $id);
-            if ($parts[0] === $provider_name) {
+            if ($parts[0] === $provider_name && $data['supports_tools']) {
                 $provider_models[$id] = $data;
             }
         }
@@ -248,29 +256,19 @@ class ProviderManager {
             
             // Use fetched models instead of static config
             $provider_config['models'] = $all_models;
-            // Organize models for better display
+            // Organize models for better display - priority providers shown first
             $priority_providers = ['openai', 'anthropic', 'google', 'meta-llama', 'mistralai', 'x-ai', 'deepseek'];
             
-            // Extract free models first
+            // Dynamically extract FREE models (all models here already support tools)
             $free_models = [];
+            $paid_models = [];
             foreach ($all_models as $model_id => $model_name) {
                 if (strpos($model_name, '🆓 FREE') !== false || strpos($model_id, ':free') !== false) {
                     $free_models[$model_id] = $model_name;
+                } else {
+                    $paid_models[$model_id] = $model_name;
                 }
             }
-            
-            // Popular paid models
-            $popular_models = [
-                'openai/gpt-4o',
-                'openai/gpt-4o-mini', 
-                'anthropic/claude-3.5-sonnet',
-                'anthropic/claude-3-haiku',
-                'google/gemini-pro-1.5',
-                'meta-llama/llama-3.3-70b-instruct',
-                'mistralai/mistral-large',
-                'x-ai/grok-beta',
-                'deepseek/deepseek-chat'
-            ];
             
             // Show AUTO ROUTER first (highly recommended)
             echo Utils::colorize("[bold][cyan]━━━ 🤖 AUTO MODEL SELECTION (RECOMMENDED) ━━━[/cyan][/bold]\n");
@@ -292,52 +290,31 @@ class ProviderManager {
             // Add to all_models so it can be displayed later
             $all_models[$auto_model] = "🤖 Auto Router (intelligent model selection)";
             
-            // Show FREE models that support tools (required for this game)
-            echo Utils::colorize("\n[bold][green]━━━ 🆓 FREE MODELS (with tool support) ━━━[/green][/bold]\n");
-            echo Utils::colorize("[dim]No API costs - these models support the tool calling this game requires![/dim]\n\n");
+            // Show FREE models (all already filtered to support tools)
+            echo Utils::colorize("\n[bold][green]━━━ 🆓 FREE MODELS ━━━[/green][/bold]\n");
+            echo Utils::colorize("[dim]No API costs - all models shown support tool calling (required for this game)[/dim]\n");
+            echo Utils::colorize("[dim]Total free models available: " . count($free_models) . "[/dim]\n\n");
             
-            // Prioritize well-known free models with tool support
-            $priority_free_models = [
-                'google/gemini-2.0-flash-exp:free',
-                'meta-llama/llama-3.3-70b-instruct:free',
-                'mistralai/mistral-small-3.1-24b-instruct:free',
-                'google/gemma-3-27b-it:free',
-                'qwen/qwen3-4b:free',
-            ];
-            
-            // Show priority free models first
-            foreach ($priority_free_models as $model_id) {
-                if (isset($free_models[$model_id])) {
-                    // Check if it supports tools (no warning badge)
-                    if (strpos($free_models[$model_id], '⚠️ No tools') === false) {
-                        $model_map[$model_index] = $model_id;
-                        echo Utils::colorize(sprintf(
-                            "[cyan]%2d.[/cyan] [bold][green]⭐ %s[/green][/bold]\n",
-                            $model_index,
-                            $free_models[$model_id]
-                        ));
-                        $model_index++;
-                        unset($free_models[$model_id]);
+            // Sort free models by provider priority, then alphabetically
+            $sorted_free_models = [];
+            foreach ($priority_providers as $provider) {
+                foreach ($free_models as $model_id => $model_name) {
+                    if (strpos($model_id, $provider . '/') === 0) {
+                        $sorted_free_models[$model_id] = $model_name;
                     }
                 }
             }
-            
-            // Show remaining free models that support tools
-            $free_count = 0;
-            $free_with_tools = [];
-            $free_without_tools = [];
-            
+            // Add remaining free models
             foreach ($free_models as $model_id => $model_name) {
-                if (strpos($model_name, '⚠️ No tools') === false) {
-                    $free_with_tools[$model_id] = $model_name;
-                } else {
-                    $free_without_tools[$model_id] = $model_name;
+                if (!isset($sorted_free_models[$model_id])) {
+                    $sorted_free_models[$model_id] = $model_name;
                 }
             }
             
-            // Show free models with tools (up to 5 more)
-            foreach ($free_with_tools as $model_id => $model_name) {
-                if ($free_count < 5) {
+            // Show first 10 free models
+            $free_shown = 0;
+            foreach ($sorted_free_models as $model_id => $model_name) {
+                if ($free_shown < 10) {
                     $model_map[$model_index] = $model_id;
                     echo Utils::colorize(sprintf(
                         "[cyan]%2d.[/cyan] [green]%s[/green]\n",
@@ -345,52 +322,71 @@ class ProviderManager {
                         $model_name
                     ));
                     $model_index++;
-                    $free_count++;
+                    $free_shown++;
                 } else {
                     break;
                 }
             }
             
-            $remaining_free_with_tools = count($free_with_tools) - $free_count;
-            if ($remaining_free_with_tools > 0) {
-                echo Utils::colorize("[dim]     ... and " . $remaining_free_with_tools . " more free models with tool support (type 'free' to see all)[/dim]\n");
+            if (count($sorted_free_models) > 10) {
+                echo Utils::colorize("[dim]     ... and " . (count($sorted_free_models) - 10) . " more free models (type 'free' to see all)[/dim]\n");
             }
             
-            // Note about free models without tools
-            if (count($free_without_tools) > 0) {
-                echo Utils::colorize("\n[dim]Note: " . count($free_without_tools) . " free models don't support tools and won't work with this game[/dim]\n");
-            }
+            // Show paid models section - dynamically sorted by price (cheapest first)
+            echo Utils::colorize("\n[yellow]━━━ Paid Models (sorted by price) ━━━[/yellow]\n");
+            echo Utils::colorize("[dim]Prices shown as input/output per 1M tokens[/dim]\n\n");
             
-            // Show popular paid models
-            echo Utils::colorize("\n[yellow]━━━ Popular Paid Models ━━━[/yellow]\n");
-            
-            foreach ($popular_models as $model) {
-                if (isset($all_models[$model]) && strpos($all_models[$model], '🆓 FREE') === false) {
-                    $model_map[$model_index] = $model;
-                    echo Utils::colorize(sprintf(
-                        "[cyan]%2d.[/cyan] [green]%s[/green]\n",
-                        $model_index,
-                        $all_models[$model]
-                    ));
-                    $model_index++;
+            // Sort paid models by input price (extract from display string)
+            $paid_with_price = [];
+            foreach ($paid_models as $model_id => $model_name) {
+                // Extract price from display name like "($0.15/$0.60 per 1M)"
+                if (preg_match('/\$([0-9.]+)\/\$([0-9.]+)/', $model_name, $matches)) {
+                    $input_price = floatval($matches[1]);
+                    $paid_with_price[$model_id] = ['name' => $model_name, 'price' => $input_price];
+                } else {
+                    $paid_with_price[$model_id] = ['name' => $model_name, 'price' => 999]; // Unknown price at end
                 }
             }
             
-            echo Utils::colorize("\n[yellow]━━━ All Models by Provider (Tool-Calling Compatible) ━━━[/yellow]\n");
-            echo Utils::colorize("[dim]Only showing models that support tool calling (required for this game)[/dim]\n");
+            // Sort by price
+            uasort($paid_with_price, function($a, $b) {
+                return $a['price'] <=> $b['price'];
+            });
+            
+            // Show first 10 paid models (cheapest)
+            $paid_shown = 0;
+            foreach ($paid_with_price as $model_id => $data) {
+                if ($paid_shown < 10) {
+                    $model_map[$model_index] = $model_id;
+                    echo Utils::colorize(sprintf(
+                        "[cyan]%2d.[/cyan] %s\n",
+                        $model_index,
+                        $data['name']
+                    ));
+                    $model_index++;
+                    $paid_shown++;
+                } else {
+                    break;
+                }
+            }
+            
+            if (count($paid_with_price) > 10) {
+                echo Utils::colorize("[dim]     ... and " . (count($paid_with_price) - 10) . " more paid models (type 'more' to see all)[/dim]\n");
+            }
+            
+            echo Utils::colorize("\n[yellow]━━━ All Models by Provider ━━━[/yellow]\n");
+            echo Utils::colorize("[dim]All " . count($all_models) . " models shown support tool calling (required for this game)[/dim]\n");
             echo Utils::colorize("[dim]Commands: 'more' = all models, 'free' = free models, 'all PROVIDER' = all from provider[/dim]\n\n");
             
             // Group remaining models
             $grouped_models = [];
             foreach ($models as $model) {
-                if (!in_array($model, $popular_models)) {
-                    $parts = explode('/', $model);
-                    $provider_name = $parts[0] ?? 'other';
-                    if (!isset($grouped_models[$provider_name])) {
-                        $grouped_models[$provider_name] = [];
-                    }
-                    $grouped_models[$provider_name][] = $model;
+                $parts = explode('/', $model);
+                $provider_name = $parts[0] ?? 'other';
+                if (!isset($grouped_models[$provider_name])) {
+                    $grouped_models[$provider_name] = [];
                 }
+                $grouped_models[$provider_name][] = $model;
             }
             
             // Track providers for "all PROVIDER" command
