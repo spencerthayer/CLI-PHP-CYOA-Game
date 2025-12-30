@@ -15,6 +15,73 @@ class ApiHandler {
         $this->debug = $debug;
     }
     
+    /**
+     * Sanitize conversation messages for API - ensure all messages have readable content
+     * Some models (especially via OpenRouter) don't properly read tool_calls in conversation history
+     */
+    private function sanitizeConversationForApi($conversation) {
+        $sanitized = [];
+        
+        foreach ($conversation as $message) {
+            $role = $message['role'] ?? 'user';
+            $content = $message['content'] ?? '';
+            
+            // Skip system messages - we add a fresh system message in the API call
+            if ($role === 'system') {
+                continue;
+            }
+            
+            // For assistant messages with tool_calls but empty/placeholder content
+            if ($role === 'assistant' && isset($message['tool_calls'])) {
+                // Extract narrative from tool_calls if content is empty or just a context marker
+                if (empty($content) || strpos($content, '[STORY CONTEXT:') === 0) {
+                    $narrative = $this->extractNarrativeFromToolCalls($message['tool_calls']);
+                    if (!empty($narrative)) {
+                        $content = $narrative;
+                    }
+                }
+            }
+            
+            // Skip empty messages
+            if (empty($content)) {
+                continue;
+            }
+            
+            // Add sanitized message with just role and content
+            // (don't include tool_calls in the history - models may not handle it properly)
+            $sanitized[] = [
+                'role' => $role,
+                'content' => $content
+            ];
+        }
+        
+        return $sanitized;
+    }
+    
+    /**
+     * Extract narrative text from tool_calls
+     */
+    private function extractNarrativeFromToolCalls($tool_calls) {
+        if (!is_array($tool_calls) || empty($tool_calls)) {
+            return '';
+        }
+        
+        foreach ($tool_calls as $tool_call) {
+            if (isset($tool_call['function']['arguments'])) {
+                $args = $tool_call['function']['arguments'];
+                if (is_string($args)) {
+                    $args = json_decode($args, true);
+                }
+                if (is_array($args) && isset($args['narrative'])) {
+                    // Return the narrative so the AI knows what happened in the story
+                    return $args['narrative'];
+                }
+            }
+        }
+        
+        return '';
+    }
+
     private function processGameMechanics($narrative) {
         $stats = $this->game_state->getCharacterStats();
         $mechanics_log = [];
@@ -621,7 +688,11 @@ class ApiHandler {
         ];
         
         // Get the updated conversation after adding skill check result
-        $updated_conversation = $has_skill_check ? $this->game_state->getConversation() : $conversation;
+        $raw_conversation = $has_skill_check ? $this->game_state->getConversation() : $conversation;
+        
+        // Sanitize conversation for API - ensure all messages have readable content
+        // Some models don't properly read tool_calls in conversation history
+        $updated_conversation = $this->sanitizeConversationForApi($raw_conversation);
         
         $data = [
             'model' => $this->provider_manager->getModel(),

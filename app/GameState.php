@@ -124,18 +124,52 @@ class GameState {
         
         if ($tool_calls) {
             $message['tool_calls'] = $tool_calls;
+            
+            // IMPORTANT: For assistant messages with tool_calls, extract the narrative
+            // and include it in content so the AI can maintain story continuity
+            if ($role === 'assistant' && empty($content)) {
+                $narrative_content = $this->extractNarrativeFromToolCalls($tool_calls);
+                if (!empty($narrative_content)) {
+                    $message['content'] = $narrative_content;
+                }
+            }
         }
         
         if ($this->debug) {
             write_debug_log("Adding message to conversation", [
                 'role' => $role,
-                'content_length' => strlen($content),
-                'has_function_call' => !is_null($function_call)
+                'content_length' => strlen($message['content']),
+                'has_function_call' => !is_null($function_call),
+                'has_tool_calls' => !is_null($tool_calls)
             ]);
         }
         
         $this->conversation[] = $message;
         $this->saveState();
+    }
+    
+    /**
+     * Extract narrative text from tool_calls for story continuity
+     */
+    private function extractNarrativeFromToolCalls($tool_calls) {
+        if (!is_array($tool_calls) || empty($tool_calls)) {
+            return '';
+        }
+        
+        foreach ($tool_calls as $tool_call) {
+            if (isset($tool_call['function']['arguments'])) {
+                $args = $tool_call['function']['arguments'];
+                if (is_string($args)) {
+                    $args = json_decode($args, true);
+                }
+                if (is_array($args) && isset($args['narrative'])) {
+                    // Return the narrative so the AI knows what happened in the story
+                    return "[STORY CONTEXT: " . $args['narrative'] . "]";
+                }
+            }
+        }
+        
+        return '';
     }
     
     public function addToHistory($role, $content, $mechanics = null) {
