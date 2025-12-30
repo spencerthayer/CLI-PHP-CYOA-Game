@@ -67,60 +67,106 @@ class ApiHandler {
     
     /**
      * Build a story summary from the conversation to help maintain continuity
+     * This creates a MANDATORY context block that the AI cannot ignore
      */
     private function buildStorySummary($conversation) {
         if (empty($conversation)) {
             return "";
         }
         
-        // Extract the last few exchanges for context
-        $recent_messages = array_slice($conversation, -6); // Last 3 exchanges (user + assistant)
-        
-        $summary = "=== STORY SO FAR ===\n";
-        
-        // Find the last assistant message to get current scene
+        // Find the last assistant message (previous scene) and last user action
         $last_scene = null;
         $last_player_action = null;
+        $second_last_scene = null;
+        $scene_count = 0;
         
         for ($i = count($conversation) - 1; $i >= 0; $i--) {
             $msg = $conversation[$i];
-            if ($msg['role'] === 'assistant' && !$last_scene) {
-                // Get first 300 chars of the narrative as the current scene
-                $last_scene = substr($msg['content'], 0, 300);
-                if (strlen($msg['content']) > 300) {
-                    $last_scene .= '...';
+            if ($msg['role'] === 'assistant') {
+                $scene_count++;
+                if ($scene_count === 1) {
+                    $last_scene = $msg['content'];
+                } else if ($scene_count === 2) {
+                    $second_last_scene = $msg['content'];
+                    break;
                 }
             } else if ($msg['role'] === 'user' && !$last_player_action && $msg['content'] !== 'start game') {
                 $last_player_action = $msg['content'];
             }
-            
-            if ($last_scene && $last_player_action) {
+        }
+        
+        $summary = "\n" .
+            "╔══════════════════════════════════════════════════════════════════════════╗\n" .
+            "║                    MANDATORY STORY CONTEXT                               ║\n" .
+            "║    YOUR RESPONSE MUST DIRECTLY CONTINUE FROM THIS SCENE!                 ║\n" .
+            "╚══════════════════════════════════════════════════════════════════════════╝\n\n";
+        
+        if ($second_last_scene) {
+            $summary .= "PREVIOUS SCENE:\n" . substr($second_last_scene, 0, 500) . "\n\n";
+        }
+        
+        if ($last_scene) {
+            $summary .= "CURRENT SCENE (where the player IS RIGHT NOW):\n" . $last_scene . "\n\n";
+        }
+        
+        if ($last_player_action) {
+            $summary .= "╔══════════════════════════════════════════════════════════════════════════╗\n";
+            $summary .= "║ PLAYER'S CHOSEN ACTION: " . substr($last_player_action, 0, 50) . str_repeat(' ', max(0, 50 - strlen(substr($last_player_action, 0, 50)))) . "║\n";
+            $summary .= "╚══════════════════════════════════════════════════════════════════════════╝\n\n";
+            $summary .= "CRITICAL INSTRUCTION: Your narrative MUST describe what happens when the player\n";
+            $summary .= "performs this action IN THE CURRENT SCENE. Do NOT create a new unrelated scene.\n";
+            $summary .= "If the action FAILED, show consequences IN THIS LOCATION with these characters.\n";
+            $summary .= "If the action SUCCEEDED, show results IN THIS LOCATION with these characters.\n\n";
+        }
+        
+        return $summary;
+    }
+    
+    /**
+     * Inject story context directly into the last user message
+     * This ensures the AI sees the context even if it ignores conversation history
+     */
+    private function injectStoryContext($conversation) {
+        if (count($conversation) < 2) {
+            return $conversation;
+        }
+        
+        // Find the last assistant message (previous scene) and last user message
+        $last_assistant_idx = -1;
+        $last_user_idx = -1;
+        
+        for ($i = count($conversation) - 1; $i >= 0; $i--) {
+            if ($conversation[$i]['role'] === 'assistant' && $last_assistant_idx === -1) {
+                $last_assistant_idx = $i;
+            }
+            if ($conversation[$i]['role'] === 'user' && $last_user_idx === -1) {
+                $last_user_idx = $i;
+            }
+            if ($last_assistant_idx !== -1 && $last_user_idx !== -1) {
                 break;
             }
         }
         
-        if ($last_scene) {
-            $summary .= "CURRENT SCENE: " . $last_scene . "\n\n";
-        }
-        
-        if ($last_player_action) {
-            $summary .= "PLAYER'S LAST ACTION: " . $last_player_action . "\n";
-            $summary .= ">>> YOU MUST describe what happens as a DIRECT RESULT of this action! <<<\n\n";
-        }
-        
-        // Count total exchanges to give sense of story length
-        $exchange_count = 0;
-        foreach ($conversation as $msg) {
-            if ($msg['role'] === 'user' && $msg['content'] !== 'start game') {
-                $exchange_count++;
+        // If we have both a previous scene and a user action after it, inject context
+        if ($last_assistant_idx !== -1 && $last_user_idx !== -1 && $last_user_idx > $last_assistant_idx) {
+            $previous_scene = $conversation[$last_assistant_idx]['content'];
+            $user_action = $conversation[$last_user_idx]['content'];
+            
+            // Don't modify "start game" message
+            if ($user_action === 'start game') {
+                return $conversation;
             }
+            
+            // Create enhanced user message with embedded context
+            $enhanced_message = "[STORY CONTEXT - You MUST continue from this scene]\n" .
+                "Previous scene: " . substr($previous_scene, 0, 800) . "\n" .
+                "[END CONTEXT]\n\n" .
+                "Player's action: " . $user_action;
+            
+            $conversation[$last_user_idx]['content'] = $enhanced_message;
         }
         
-        if ($exchange_count > 0) {
-            $summary .= "Story progress: " . $exchange_count . " player actions taken so far.\n\n";
-        }
-        
-        return $summary;
+        return $conversation;
     }
     
     /**
@@ -758,6 +804,10 @@ class ApiHandler {
         // Sanitize conversation for API - ensure all messages have readable content
         // Some models don't properly read tool_calls in conversation history
         $updated_conversation = $this->sanitizeConversationForApi($raw_conversation);
+        
+        // CRITICAL: Inject story context directly into the last user message
+        // This forces the AI to see the previous scene context even if it ignores conversation history
+        $updated_conversation = $this->injectStoryContext($updated_conversation);
         
         // Build the story continuity context from the conversation
         $story_summary = $this->buildStorySummary($updated_conversation);
