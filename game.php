@@ -547,6 +547,29 @@ while (true) {
                 if (preg_match('/^[1-4]$/', $user_input) && $scene_data && isset($current_options[$user_input - 1])) {
                     $chosen_option = $current_options[$user_input - 1];
                     
+                    // Map common AI attribute mistakes to valid game attributes
+                    $attribute_map = [
+                        // Common mistakes -> Valid attributes
+                        'Intelligence' => 'Intellect',
+                        'Int' => 'Intellect',
+                        'Arcana' => 'Knowledge',
+                        'Magic' => 'Spirit',
+                        'Stealth' => 'Agility',
+                        'Athletics' => 'Strength',
+                        'Intimidation' => 'Charisma',
+                        'Persuasion' => 'Charisma',
+                        'Investigation' => 'Perception',
+                        'Insight' => 'Wisdom',
+                        'Survival' => 'Knowledge',
+                        'Acrobatics' => 'Agility',
+                        'Constitution' => 'Endurance',
+                        'Con' => 'Endurance',
+                        'Wis' => 'Wisdom',
+                        'Cha' => 'Charisma',
+                        'Dex' => 'Dexterity',
+                        'Str' => 'Strength',
+                    ];
+                    
                     // Check for various types of checks in the option text
                     // Support multiple formats for attribute checks:
                     // - [Attribute DC:X] e.g., [Perception DC:8]
@@ -566,6 +589,10 @@ while (true) {
                                 case 'ATTRIBUTE_CHECK':
                                 case 'SKILL_CHECK':
                                     $attribute = $matches[1];
+                                    // Map invalid attribute names to valid ones
+                                    if (isset($attribute_map[$attribute])) {
+                                        $attribute = $attribute_map[$attribute];
+                                    }
                                     $difficulty = intval($matches[2]);
                                     $result = $gameState->getCharacterStats()->skillCheck($attribute, $difficulty);
                                     echo Utils::colorize(sprintf(
@@ -623,6 +650,21 @@ while (true) {
                             
                             if ($result) {
                                 $gameState->setLastCheckResult($result);
+                                
+                                // CRITICAL: Add skill check result to conversation BEFORE API call
+                                // This tells the AI whether the action succeeded or failed
+                                $check_type_name = isset($result['save_type']) ? $result['save_type'] . ' Save' : $attribute . ' Check';
+                                $margin = $result['total'] - $difficulty;
+                                $severity = $result['success'] ? 
+                                    ($margin >= 10 ? 'CRITICAL SUCCESS' : ($margin >= 5 ? 'GREAT SUCCESS' : 'SUCCESS')) :
+                                    ($margin <= -10 ? 'CRITICAL FAILURE' : ($margin <= -5 ? 'MAJOR FAILURE' : 'FAILURE'));
+                                
+                                $skill_check_narrative = "[SKILL CHECK RESULT: " . $check_type_name . " - " . 
+                                    $result['total'] . " vs DC " . $difficulty . " = " . $severity . 
+                                    ". The player's action " . ($result['success'] ? "SUCCEEDS" : "FAILS") . 
+                                    ". You MUST write the narrative showing this " . ($result['success'] ? "success" : "failure") . ".]";
+                                
+                                $gameState->addMessage('system', $skill_check_narrative);
                             }
                         }
                     }

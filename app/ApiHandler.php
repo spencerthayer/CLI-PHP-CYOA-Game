@@ -868,15 +868,19 @@ class ApiHandler {
             "1. The user message contains a SCENE and an ACTION. You MUST continue from that EXACT scene.\n" .
             "2. Your narrative describes what happens when the player does that action IN THAT LOCATION.\n" .
             "3. NEVER start a new story. NEVER teleport to a different location. NEVER ignore the context.\n" .
-            "4. If the scene mentions a tavern, YOU ARE IN A TAVERN. If it mentions a tower, YOU ARE IN A TOWER.\n" .
+            "4. The ACTION the player chose IS what happens next. Describe THAT action's consequences.\n" .
             "5. If a SKILL CHECK result is provided, your narrative MUST reflect that outcome.\n\n" .
-            
+
+            "VALID ATTRIBUTES FOR SKILL CHECKS (use ONLY these):\n" .
+            "Agility, Charisma, Dexterity, Endurance, Intellect, Knowledge, Luck, Perception, Spirit, Strength, Vitality, Willpower, Wisdom\n" .
+            "DO NOT use: Intelligence (use Intellect), Arcana (use Knowledge), Stealth (use Agility), Athletics (use Strength)\n\n" .
+
             "RESPONSE FORMAT (use GameResponse tool):\n" .
-            "- narrative: 2-4 paragraphs continuing the SAME scene\n" .
-            "- options: 4 choices with emoji, text, skill_check [Attribute DC:X]\n" .
+            "- narrative: 2-4 paragraphs describing the DIRECT result of the player's action in the SAME location\n" .
+            "- options: 4 choices with emoji, text, skill_check [Attribute DC:X] using ONLY valid attributes above\n" .
             "- image: Short prompt for scene visualization\n\n" .
-            
-            "PLAYER: Health " . $stats->getStat('Health')['current'] . "/" . $stats->getStat('Health')['max'] . 
+
+            "PLAYER: Health " . $stats->getStat('Health')['current'] . "/" . $stats->getStat('Health')['max'] .
             " | Sanity " . $stats->getStat('Sanity')['current'] . "/" . $stats->getStat('Sanity')['max'] . "\n";
         
         if ($this->debug) {
