@@ -540,9 +540,11 @@ while (true) {
                     $chosen_option = $current_options[$user_input - 1];
                     
                     // Check for various types of checks in the option text
-                    // Support both [Attribute DC:X] and legacy [SKILL_CHECK:Attribute:X] formats
+                    // Support multiple formats for attribute checks:
+                    // - [Attribute DC:X] e.g., [Perception DC:8]
+                    // - [Attribute modifier:X] e.g., [Perception -1:8], [Agility 0:10], [Strength +2:12]
                     $check_patterns = [
-                        'ATTRIBUTE_CHECK' => '/\[(\w+)\s+DC:(\d+)\]/',  // New format: [Knowledge DC:15]
+                        'ATTRIBUTE_CHECK' => '/\[(\w+)\s+(?:DC:|[+-]?\d+:)(\d+)\]/',  // Matches both DC:X and modifier:X formats
                         'SKILL_CHECK' => '/\[SKILL_CHECK:(\w+):(\d+)\]/', // Legacy format
                         'SAVE' => '/\[SAVE:(\w+):(\d+)\]/',
                         'SANITY_CHECK' => '/\[SANITY_CHECK:(\d+)\]/'
