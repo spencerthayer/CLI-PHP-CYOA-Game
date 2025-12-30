@@ -87,6 +87,9 @@ if (php_sapi_name() !== 'cli') {
     die("This script must be run from the command line.\n");
 }
 
+// Clear the terminal screen on startup
+echo "\033[2J\033[H";
+
 // Load configuration
 $config = require __DIR__ . '/app/config.php';
 
