@@ -544,7 +544,9 @@ class ProviderManager {
         
         $this->model = $model_choice;
         
-        echo Utils::colorize("\n[green]Selected model: " . $provider_config['models'][$this->model] . "[/green]\n");
+        // Get display name, handling special models like openrouter/auto
+        $display_name = $all_models[$this->model] ?? $provider_config['models'][$this->model] ?? $this->model;
+        echo Utils::colorize("\n[green]Selected model: " . $display_name . "[/green]\n");
         
         // Save configuration
         $this->saveProviderSettings();

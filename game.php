@@ -345,6 +345,14 @@ if ($should_make_api_call) {
             if (!isset($scene_data->timestamp)) {
                 $scene_data->timestamp = time();
             }
+            
+            // Show which model was actually used (helpful for openrouter/auto)
+            $actual_model = $gameState->getLastUsedModel();
+            if ($actual_model) {
+                if ($providerManager->getModel() === 'openrouter/auto') {
+                    echo Utils::colorize("\n[dim]Auto-routed to: " . $actual_model . "[/dim]\n");
+                }
+            }
     } else {
         throw new \Exception("No valid response from API");
     }
@@ -726,8 +734,10 @@ while (true) {
                 
                 // Show which model was actually used (helpful for openrouter/auto)
                 $actual_model = $gameState->getLastUsedModel();
-                if ($actual_model && $providerManager->getModel() === 'openrouter/auto') {
-                    echo Utils::colorize("[dim]Auto-routed to: " . $actual_model . "[/dim]\n");
+                if ($actual_model) {
+                    if ($providerManager->getModel() === 'openrouter/auto') {
+                        echo Utils::colorize("\n[dim]Auto-routed to: " . $actual_model . "[/dim]\n");
+                    }
                 }
             } else {
                 throw new \Exception("No valid response from API");
