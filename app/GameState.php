@@ -125,12 +125,22 @@ class GameState {
         if ($tool_calls) {
             $message['tool_calls'] = $tool_calls;
             
-            // IMPORTANT: For assistant messages with tool_calls, extract the narrative
-            // and include it in content so the AI can maintain story continuity
-            if ($role === 'assistant' && empty($content)) {
+            // CRITICAL: For assistant messages with tool_calls, extract the narrative
+            // and store it DIRECTLY in content so it's available for conversation history
+            if ($role === 'assistant') {
                 $narrative_content = $this->extractNarrativeFromToolCalls($tool_calls);
                 if (!empty($narrative_content)) {
                     $message['content'] = $narrative_content;
+                    if ($this->debug) {
+                        write_debug_log("Stored narrative in assistant content", [
+                            'narrative_length' => strlen($narrative_content),
+                            'preview' => substr($narrative_content, 0, 100)
+                        ]);
+                    }
+                } else if ($this->debug) {
+                    write_debug_log("WARNING: Failed to extract narrative from tool_calls", [
+                        'tool_calls' => json_encode($tool_calls)
+                    ]);
                 }
             }
         }
@@ -139,6 +149,7 @@ class GameState {
             write_debug_log("Adding message to conversation", [
                 'role' => $role,
                 'content_length' => strlen($message['content']),
+                'content_preview' => substr($message['content'], 0, 100),
                 'has_function_call' => !is_null($function_call),
                 'has_tool_calls' => !is_null($tool_calls)
             ]);
