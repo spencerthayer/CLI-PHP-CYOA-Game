@@ -44,6 +44,8 @@ $useChunky = in_array('--chunky', $argv);
 $setupProvider = in_array('--setup', $argv);
 $showConfig = in_array('--config', $argv);
 $refreshModels = in_array('--refresh-models', $argv);
+$noImages = in_array('--no-images', $argv);
+$noAudio = in_array('--no-audio', $argv);
 
 // Function to display help message
 function displayHelp() {
@@ -53,6 +55,8 @@ function displayHelp() {
     echo Utils::colorize("  [cyan]--new[/cyan]             Start a new game\n");
     echo Utils::colorize("  [cyan]--debug[/cyan]           Enable debug mode\n");
     echo Utils::colorize("  [cyan]--chunky[/cyan]          Use Chunky ASCII art mode\n");
+    echo Utils::colorize("  [cyan]--no-images[/cyan]       Disable image generation\n");
+    echo Utils::colorize("  [cyan]--no-audio[/cyan]        Disable audio generation\n");
     echo Utils::colorize("  [cyan]--setup[/cyan]           Configure AI provider and model\n");
     echo Utils::colorize("  [cyan]--config[/cyan]          Display current configuration\n");
     echo Utils::colorize("  [cyan]--refresh-models[/cyan]  Clear OpenRouter model cache\n");
@@ -192,9 +196,9 @@ write_debug_log("ApiHandler initialized with ProviderManager and CharacterStats 
     'model' => $providerManager->getModel()
 ]);
 
-// Initialize game variables
-$generate_image_toggle = $config['game']['generate_image_toggle'] ?? true;
-$generate_audio_toggle = $config['game']['audio_toggle'] ?? true;
+// Initialize game variables (command line flags override config)
+$generate_image_toggle = $noImages ? false : ($config['game']['generate_image_toggle'] ?? true);
+$generate_audio_toggle = $noAudio ? false : ($config['game']['audio_toggle'] ?? true);
 $should_make_api_call = false;
 $last_user_input = '';
 $scene_data = null;
