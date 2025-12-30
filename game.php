@@ -314,8 +314,26 @@ if (empty($conversation) || $starting_new_game) {
     $last_user_input = 'start game';
     $scene_data = null; // Reset scene data for new game
 } else {
-    // Skip initial scene loading - we'll handle it in the main loop
-    $should_make_api_call = false;
+    // Check if we have an assistant response (scene data) in the conversation
+    $has_assistant_response = false;
+    foreach ($conversation as $msg) {
+        if ($msg['role'] === 'assistant' && (isset($msg['tool_calls']) || !empty($msg['content']))) {
+            $has_assistant_response = true;
+            break;
+        }
+    }
+    
+    if (!$has_assistant_response) {
+        // Conversation exists but no scene yet - need to make API call
+        write_debug_log("Conversation exists but no assistant response - making API call");
+        $should_make_api_call = true;
+        $last_user_input = 'start game';
+        $scene_data = null;
+    } else {
+        // We have existing scene data - will extract in main loop
+        write_debug_log("Resuming existing game with scene data");
+        $should_make_api_call = false;
+    }
 }
 
 // Make initial API call if needed
