@@ -55,7 +55,7 @@ class ApiHandler {
             if ($role === 'assistant') {
                 // Strip any wrapper prefixes if present
                 $content = preg_replace('/^\[STORY CONTEXT:[^\]]*\]\s*/', '', $content);
-                
+
                 // If content is still empty but we have tool_calls, extract narrative from them
                 if (empty(trim($content)) && isset($message['tool_calls'])) {
                     $narrative = $this->extractNarrativeFromToolCalls($message['tool_calls']);
@@ -67,9 +67,14 @@ class ApiHandler {
                                 'narrative_length' => strlen($narrative)
                             ]);
                         }
+                    } else if ($this->debug) {
+                        write_debug_log("WARNING: Failed to extract narrative from tool_calls", [
+                            'index' => $index,
+                            'tool_calls_structure' => json_encode(array_keys($message['tool_calls'][0] ?? []))
+                        ]);
                     }
                 }
-                
+
                 // If still empty, try to get from function_call (legacy format)
                 if (empty(trim($content)) && isset($message['function_call']['arguments'])) {
                     $args = $message['function_call']['arguments'];
@@ -80,14 +85,24 @@ class ApiHandler {
                         $content = $args['narrative'];
                     }
                 }
+                
+                if ($this->debug && !empty(trim($content))) {
+                    write_debug_log("Assistant message has content", [
+                        'index' => $index,
+                        'content_length' => strlen($content),
+                        'preview' => substr($content, 0, 100)
+                    ]);
+                }
             }
-            
+
             // Skip empty messages
             if (empty(trim($content))) {
                 if ($this->debug) {
                     write_debug_log("Skipping empty message", [
                         'index' => $index,
-                        'role' => $role
+                        'role' => $role,
+                        'has_tool_calls' => isset($message['tool_calls']),
+                        'has_function_call' => isset($message['function_call'])
                     ]);
                 }
                 continue;
@@ -128,15 +143,31 @@ class ApiHandler {
      * to prevent the model from getting confused by old messages
      */
     private function injectStoryContext($conversation) {
-        if (count($conversation) < 2) {
-            return $conversation;
+        if ($this->debug) {
+            write_debug_log("injectStoryContext called", [
+                'conversation_count' => count($conversation),
+                'messages' => array_map(function($m) {
+                    return [
+                        'role' => $m['role'],
+                        'content_length' => strlen($m['content'] ?? ''),
+                        'preview' => substr($m['content'] ?? '', 0, 80)
+                    ];
+                }, $conversation)
+            ]);
         }
         
+        if (count($conversation) < 2) {
+            if ($this->debug) {
+                write_debug_log("injectStoryContext: Not enough messages", ['count' => count($conversation)]);
+            }
+            return $conversation;
+        }
+
         // Find the last assistant message (previous scene) and last user message
         $last_assistant_idx = -1;
         $last_user_idx = -1;
         $skill_check_context = null;
-        
+
         for ($i = count($conversation) - 1; $i >= 0; $i--) {
             if ($conversation[$i]['role'] === 'assistant' && $last_assistant_idx === -1) {
                 $last_assistant_idx = $i;
@@ -153,7 +184,16 @@ class ApiHandler {
                 break;
             }
         }
-        
+
+        if ($this->debug) {
+            write_debug_log("injectStoryContext: Found indices", [
+                'last_assistant_idx' => $last_assistant_idx,
+                'last_user_idx' => $last_user_idx,
+                'has_skill_check' => !is_null($skill_check_context),
+                'condition_met' => ($last_assistant_idx !== -1 && $last_user_idx !== -1 && $last_user_idx > $last_assistant_idx)
+            ]);
+        }
+
         // If we have both a previous scene and a user action after it, inject context
         if ($last_assistant_idx !== -1 && $last_user_idx !== -1 && $last_user_idx > $last_assistant_idx) {
             $previous_scene = $conversation[$last_assistant_idx]['content'];
