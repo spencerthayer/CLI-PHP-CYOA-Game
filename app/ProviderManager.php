@@ -285,6 +285,9 @@ class ProviderManager {
                 "openrouter/auto - Auto Router (intelligently selects best model)"
             ));
             echo Utils::colorize("[dim]    Powered by NotDiamond - analyzes your prompt and routes to optimal model[/dim]\n");
+            echo Utils::colorize("[bold][red]⚠️  WARNING: Auto Router can be VERY EXPENSIVE![/red][/bold]\n");
+            echo Utils::colorize("[dim]    May route to premium models like Claude/GPT-4 at \$15-60+/million tokens.[/dim]\n");
+            echo Utils::colorize("[dim]    Consider a FREE model or specific paid model for predictable costs.[/dim]\n");
             $model_index++;
             
             // Add to all_models so it can be displayed later
