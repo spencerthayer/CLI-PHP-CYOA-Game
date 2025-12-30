@@ -292,27 +292,52 @@ class ProviderManager {
             // Add to all_models so it can be displayed later
             $all_models[$auto_model] = "🤖 Auto Router (intelligent model selection)";
             
-            // Show FREE models next (highlighted)
-            echo Utils::colorize("\n[bold][green]━━━ 🆓 FREE MODELS ━━━[/green][/bold]\n");
-            echo Utils::colorize("[dim]No API costs - great for testing and development![/dim]\n\n");
+            // Show FREE models that support tools (required for this game)
+            echo Utils::colorize("\n[bold][green]━━━ 🆓 FREE MODELS (with tool support) ━━━[/green][/bold]\n");
+            echo Utils::colorize("[dim]No API costs - these models support the tool calling this game requires![/dim]\n\n");
             
-            // Venice uncensored model first if available
-            $venice_model = 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free';
-            if (isset($free_models[$venice_model])) {
-                $model_map[$model_index] = $venice_model;
-                echo Utils::colorize(sprintf(
-                    "[cyan]%2d.[/cyan] [bold][green]⭐ %s[/green][/bold]\n",
-                    $model_index,
-                    $free_models[$venice_model]
-                ));
-                $model_index++;
-                unset($free_models[$venice_model]);
+            // Prioritize well-known free models with tool support
+            $priority_free_models = [
+                'google/gemini-2.0-flash-exp:free',
+                'meta-llama/llama-3.3-70b-instruct:free',
+                'mistralai/mistral-small-3.1-24b-instruct:free',
+                'google/gemma-3-27b-it:free',
+                'qwen/qwen3-4b:free',
+            ];
+            
+            // Show priority free models first
+            foreach ($priority_free_models as $model_id) {
+                if (isset($free_models[$model_id])) {
+                    // Check if it supports tools (no warning badge)
+                    if (strpos($free_models[$model_id], '⚠️ No tools') === false) {
+                        $model_map[$model_index] = $model_id;
+                        echo Utils::colorize(sprintf(
+                            "[cyan]%2d.[/cyan] [bold][green]⭐ %s[/green][/bold]\n",
+                            $model_index,
+                            $free_models[$model_id]
+                        ));
+                        $model_index++;
+                        unset($free_models[$model_id]);
+                    }
+                }
             }
             
-            // Show up to 9 more free models
+            // Show remaining free models that support tools
             $free_count = 0;
+            $free_with_tools = [];
+            $free_without_tools = [];
+            
             foreach ($free_models as $model_id => $model_name) {
-                if ($free_count < 9) {
+                if (strpos($model_name, '⚠️ No tools') === false) {
+                    $free_with_tools[$model_id] = $model_name;
+                } else {
+                    $free_without_tools[$model_id] = $model_name;
+                }
+            }
+            
+            // Show free models with tools (up to 5 more)
+            foreach ($free_with_tools as $model_id => $model_name) {
+                if ($free_count < 5) {
                     $model_map[$model_index] = $model_id;
                     echo Utils::colorize(sprintf(
                         "[cyan]%2d.[/cyan] [green]%s[/green]\n",
@@ -326,8 +351,14 @@ class ProviderManager {
                 }
             }
             
-            if (count($free_models) > 9) {
-                echo Utils::colorize("[dim]     ... and " . (count($free_models) - 9) . " more free models (type 'free' to see all)[/dim]\n");
+            $remaining_free_with_tools = count($free_with_tools) - $free_count;
+            if ($remaining_free_with_tools > 0) {
+                echo Utils::colorize("[dim]     ... and " . $remaining_free_with_tools . " more free models with tool support (type 'free' to see all)[/dim]\n");
+            }
+            
+            // Note about free models without tools
+            if (count($free_without_tools) > 0) {
+                echo Utils::colorize("\n[dim]Note: " . count($free_without_tools) . " free models don't support tools and won't work with this game[/dim]\n");
             }
             
             // Show popular paid models
