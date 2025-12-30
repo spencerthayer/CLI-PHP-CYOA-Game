@@ -723,6 +723,12 @@ while (true) {
                 if (!isset($scene_data->timestamp)) {
                     $scene_data->timestamp = $current_timestamp;
                 }
+                
+                // Show which model was actually used (helpful for openrouter/auto)
+                $actual_model = $gameState->getLastUsedModel();
+                if ($actual_model && $providerManager->getModel() === 'openrouter/auto') {
+                    echo Utils::colorize("[dim]Auto-routed to: " . $actual_model . "[/dim]\n");
+                }
             } else {
                 throw new \Exception("No valid response from API");
             }

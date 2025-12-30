@@ -241,18 +241,36 @@ class ProviderManager {
                 'deepseek/deepseek-chat'
             ];
             
-            // Show FREE models first (highlighted)
-            echo Utils::colorize("[bold][green]━━━ 🆓 FREE MODELS ━━━[/green][/bold]\n");
-            echo Utils::colorize("[dim]No API costs - great for testing and development![/dim]\n\n");
+            // Show AUTO ROUTER first (highly recommended)
+            echo Utils::colorize("[bold][cyan]━━━ 🤖 AUTO MODEL SELECTION (RECOMMENDED) ━━━[/cyan][/bold]\n");
+            echo Utils::colorize("[dim]Let OpenRouter automatically choose the best model for each prompt![/dim]\n\n");
             $model_index = 1;
             $model_map = [];
+            
+            // Auto Router as the recommended default
+            $auto_model = 'openrouter/auto';
+            $model_map[$model_index] = $auto_model;
+            echo Utils::colorize(sprintf(
+                "[cyan]%2d.[/cyan] [bold][magenta]⭐ %s[/magenta][/bold] [yellow](RECOMMENDED)[/yellow]\n",
+                $model_index,
+                "openrouter/auto - Auto Router (intelligently selects best model)"
+            ));
+            echo Utils::colorize("[dim]    Powered by NotDiamond - analyzes your prompt and routes to optimal model[/dim]\n");
+            $model_index++;
+            
+            // Add to all_models so it can be displayed later
+            $all_models[$auto_model] = "🤖 Auto Router (intelligent model selection)";
+            
+            // Show FREE models next (highlighted)
+            echo Utils::colorize("\n[bold][green]━━━ 🆓 FREE MODELS ━━━[/green][/bold]\n");
+            echo Utils::colorize("[dim]No API costs - great for testing and development![/dim]\n\n");
             
             // Venice uncensored model first if available
             $venice_model = 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free';
             if (isset($free_models[$venice_model])) {
                 $model_map[$model_index] = $venice_model;
                 echo Utils::colorize(sprintf(
-                    "[cyan]%2d.[/cyan] [bold][green]⭐ %s[/green][/bold] [yellow](DEFAULT)[/yellow]\n",
+                    "[cyan]%2d.[/cyan] [bold][green]⭐ %s[/green][/bold]\n",
                     $model_index,
                     $free_models[$venice_model]
                 ));

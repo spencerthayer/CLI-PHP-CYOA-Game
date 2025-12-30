@@ -11,6 +11,7 @@ class GameState {
     private $character_stats;
     private $debug;
     private $last_check_result = null;
+    private $last_used_model = null;
     
     public function __construct($config, $debug = false) {
         $this->config = $config;
@@ -283,5 +284,16 @@ class GameState {
 
     public function clearLastCheckResult() {
         $this->last_check_result = null;
+    }
+    
+    public function setLastUsedModel($model) {
+        $this->last_used_model = $model;
+        if ($this->debug) {
+            write_debug_log("Set last used model", ['model' => $model]);
+        }
+    }
+    
+    public function getLastUsedModel() {
+        return $this->last_used_model;
     }
 } 

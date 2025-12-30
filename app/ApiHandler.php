@@ -628,6 +628,16 @@ class ApiHandler {
         // Handle tool_calls format (OpenRouter only)
         $function_args = null;
         
+        // Capture the actual model used (important for openrouter/auto)
+        if (isset($response_data['model'])) {
+            $actual_model = $response_data['model'];
+            // Store it for display purposes
+            $this->game_state->setLastUsedModel($actual_model);
+            if ($this->debug) {
+                write_debug_log("Actual model used", ['model' => $actual_model]);
+            }
+        }
+        
         if (isset($response_data['choices'][0]['message']['tool_calls'][0]['function']['arguments'])) {
             // OpenRouter/tools format
             $function_args = json_decode($response_data['choices'][0]['message']['tool_calls'][0]['function']['arguments'], true);

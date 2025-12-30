@@ -17,6 +17,14 @@ class Utils {
             '[/cyan]' => "\033[0m",
             '[bold]' => "\033[1m",
             '[/bold]' => "\033[22m",
+            '[dim]' => "\033[2m",
+            '[/dim]' => "\033[22m",
+            '[magenta]' => "\033[35m",
+            '[/magenta]' => "\033[0m",
+            '[white]' => "\033[37m",
+            '[/white]' => "\033[0m",
+            '[gray]' => "\033[90m",
+            '[/gray]' => "\033[0m",
         ];
         // Apply the color codes
         return str_replace(array_keys($color_codes), array_values($color_codes), $text);
